@@ -1,4 +1,6 @@
-FROM node:22-alpine
+FROM --platform=linux/amd64 node:22-alpine
+
+USER root
 
 WORKDIR /app
 
@@ -8,8 +10,6 @@ RUN npm install
 COPY src/ ./src/
 COPY tsconfig.json ./
 
-RUN npm run build
-
 EXPOSE 8080
 
-CMD ["npm", "start"]
+CMD ["npx", "ts-node", "src/index.ts"]
