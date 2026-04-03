@@ -22,6 +22,11 @@ Thumbs.db
 .env
 .env*.local
 .env.local
+.env.production
+.env.development
+*.pem
+*.key
+secrets/
 
 # Private keys
 Private_Key
@@ -51,6 +56,9 @@ pnpm-debug.log*
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# Tesseract language data (downloaded at runtime; do not commit large binaries)
+*.traineddata
 
 # Wispr Flow files (not part of Dokimos)
 dokimos-app/wispr_flow_css_files/

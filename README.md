@@ -2,6 +2,8 @@
 
 A working React prototype of the Dokimos identity verification flow with animation sequence.
 
+**Security:** This repo is a prototype. Read [SECURITY.md](./SECURITY.md) before deploying or publishing.
+
 ## What's Included
 
 - **Animation Sequence (3 states):**

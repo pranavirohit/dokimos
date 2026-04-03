@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import axios from "axios";
 import { logApiError } from "@/lib/safeLog";
 
-const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB in base64 is ~13.3MB
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check base64 size (rough estimate: base64 is ~1.37x original size)
+    // Check base64 size
     if (imageBase64.length > MAX_IMAGE_SIZE * 1.37) {
       return NextResponse.json(
         { error: "Image too large. Maximum size is 10MB" },
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get TEE endpoint from server-side env (not exposed to frontend)
-    const TEE_ENDPOINT = process.env.TEE_ENDPOINT || "http://localhost:8080";
+    const TEE_ENDPOINT = process.env.TEE_ENDPOINT || "http://localhost:8082";
 
     // Call TEE service
     const response = await axios.post(
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
         requestedAttributes: requestedAttributes || [],
       },
       {
-        timeout: 60000, // 60 second timeout
+        timeout: 60000,
         headers: {
           "Content-Type": "application/json",
         },
@@ -48,7 +48,6 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     logApiError("TEE verification failed", error);
 
-    // Return generic error to client
     return NextResponse.json(
       { error: "Verification failed. Please try again." },
       { status: 500 }

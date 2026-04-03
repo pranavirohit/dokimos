@@ -1,0 +1,30 @@
+import type { Metadata } from "next";
+import "./globals.css";
+import { SessionProvider } from "@/components/SessionProvider";
+
+export const metadata: Metadata = {
+  title: "Dokimos - Identity Verification Vault",
+  description: "Verify once. Share everywhere.",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:wght@400;700&family=Instrument+Sans:wght@400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body>
+        <SessionProvider>{children}</SessionProvider>
+      </body>
+    </html>
+  );
+}
