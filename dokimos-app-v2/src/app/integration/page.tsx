@@ -101,7 +101,7 @@ function WidgetTab({ copyToClipboard, copiedCode }: { copyToClipboard: (code: st
   const widgetCode = `<!-- Add to your signup page -->
 <script src="https://verify.dokimos.com/widget.js"></script>
 <div id="dokimos-verify" 
-     data-workflow="driver_onboarding"
+     data-workflow="driver_background_check"
      data-api-key="your_api_key"
      data-callback="handleVerification">
 </div>
@@ -200,10 +200,10 @@ function APITab({ copyToClipboard, copiedCode }: { copyToClipboard: (code: strin
         verifierId: 'verifier_001', // Acme Brokerage
         userEmail: 'pranavi@example.com',
         requestedAttributes: ['ageOver21', 'name', 'notExpired', 'documentType'],
-        workflow: 'driver_onboarding'
+        workflow: 'driver_background_check'
       });
 
-      setTestResult(`✅ Workflow verification triggered!\n\nWorkflow: Driver Onboarding\nRequest ID: ${response.data.requestId}\nUser: pranavi@example.com\n\nThe user will see this request in their Dokimos app.\nCheck the Verifier Dashboard to monitor status.`);
+      setTestResult(`✅ Workflow verification triggered!\n\nWorkflow: Driver Background Check\nRequest ID: ${response.data.requestId}\nUser: pranavi@example.com\n\nThe user will see this request in their Dokimos app.\nCheck the Verifier Dashboard to monitor status.`);
     } catch (error: any) {
       setTestResult(`❌ Error: ${error.response?.data?.error || error.message}`);
     } finally {
@@ -221,7 +221,7 @@ const response = await fetch('https://api.dokimos.com/verify', {
   body: JSON.stringify({
     userId: 'driver_12345',
     email: 'driver@example.com',
-    workflow: 'driver_onboarding',
+    workflow: 'driver_background_check',
     callbackUrl: 'https://yourapp.com/webhooks/dokimos'
   })
 });
@@ -340,7 +340,7 @@ app.post('/webhooks/dokimos', async (req, res) => {
             <strong className="text-slate-200">What this simulates:</strong>
           </p>
           <p className="text-xs text-slate-400">
-            POST /api/request-verification with workflow "driver_onboarding" for pranavi@example.com
+            POST /api/request-verification with workflow "driver_background_check" for pranavi@example.com
           </p>
           <p className="text-xs text-slate-400 mt-2">
             In production, this API call would be triggered automatically when a user signs up in your app (e.g., Uber driver signup flow).

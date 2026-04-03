@@ -41,24 +41,26 @@ export default function VerifierSignupPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center p-6">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-dokimos-navy via-[#15245a] to-dokimos-navy p-6">
       <div className="w-full max-w-md">
         {/* Logo */}
-        <div className="flex items-center justify-center mb-8">
-          <Building2 className="w-12 h-12 text-indigo-400" />
-          <h1 className="ml-3 text-3xl font-bold text-white" style={{ fontFamily: "'Instrument Serif', serif" }}>
+        <div className="mb-8 flex flex-col items-center gap-4">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/20">
+            <Building2 className="h-8 w-8 text-white" strokeWidth={2} />
+          </div>
+          <h1 className="text-center font-serif text-3xl font-bold tracking-tight text-white">
             Dokimos for Business
           </h1>
         </div>
 
         {/* Tagline */}
-        <p className="text-center text-slate-300 mb-8">
+        <p className="mb-8 text-center text-[15px] leading-relaxed text-white/75">
           Verify customer identities with zero-knowledge proofs
         </p>
 
         {/* Signup Form */}
-        <div className="bg-white rounded-2xl p-8 shadow-xl">
-          <h2 className="text-2xl font-semibold mb-6 text-gray-900">Create Verifier Account</h2>
+        <div className="rounded-2xl bg-white p-8 shadow-2xl ring-1 ring-black/5">
+          <h2 className="mb-6 text-xl font-bold text-dokimos-navy">Create verifier account</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -70,7 +72,7 @@ export default function VerifierSignupPage() {
                 type="text"
                 value={formData.companyName}
                 onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-transparent focus:ring-2 focus:ring-indigo-500"
                 placeholder="Acme Brokerage"
                 required
               />
@@ -85,7 +87,7 @@ export default function VerifierSignupPage() {
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-transparent focus:ring-2 focus:ring-indigo-500"
                 placeholder="contact@acme.com"
                 required
               />
@@ -100,7 +102,7 @@ export default function VerifierSignupPage() {
                 type="password"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-transparent focus:ring-2 focus:ring-indigo-500"
                 required
               />
             </div>
@@ -114,7 +116,7 @@ export default function VerifierSignupPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
+              className="w-full rounded-xl bg-indigo-600 py-3.5 text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:opacity-50"
             >
               {loading ? "Creating Account..." : "Create Verifier Account"}
             </button>

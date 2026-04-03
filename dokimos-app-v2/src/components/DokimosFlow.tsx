@@ -1349,7 +1349,10 @@ function Screen06History({
       if (!userSession) return;
       
       const { email } = JSON.parse(userSession);
-      const response = await axios.get(`/api/requests/user/${encodeURIComponent(email)}`);
+      const response = await axios.get(
+        `/api/requests/user/${encodeURIComponent(email)}`,
+        { timeout: 15000 }
+      );
       setRequests(response.data);
     } catch (err) {
       console.error("Failed to fetch requests:", err);
