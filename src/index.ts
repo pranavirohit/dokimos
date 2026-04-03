@@ -1,17 +1,53 @@
 import dotenv from 'dotenv';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import { hashMessage } from 'viem';
+import { hashMessage, verifyMessage } from 'viem';
 import { mnemonicToAccount } from 'viem/accounts';
-import {
-  verifyDokimosAttestation,
-  DEFAULT_EIGEN_APP_ID,
-  type DokimosAttestationInput,
-} from './verifyAttestation';
 import { createWorker } from 'tesseract.js';
 import crypto from 'crypto';
 
 dotenv.config();
+
+/** Inlined here so Docker/ts-node only needs index.ts (avoids missing-module issues on deploy). */
+const DEFAULT_EIGEN_APP_ID =
+  '0x5911a27103C4de497fCB5C00D8e19962EEF0008E';
+
+type DokimosAttestationInput = {
+  message: string;
+  signature: `0x${string}`;
+  signer: `0x${string}`;
+  tee?: { quote?: string; mrenclave?: string; platform?: string };
+  eigen?: { appId?: string; verificationUrl?: string; verified?: boolean };
+};
+
+async function verifyDokimosAttestation(
+  attestation: DokimosAttestationInput,
+  options?: { expectedEigenAppId?: string }
+) {
+  const signatureValid = await verifyMessage({
+    address: attestation.signer,
+    message: attestation.message,
+    signature: attestation.signature,
+  });
+  const t = attestation.tee;
+  const teeFieldsPresent = Boolean(
+    t?.quote && t.quote.length > 0 && t?.mrenclave && t.mrenclave.length > 0
+  );
+  const e = attestation.eigen;
+  const eigenMetadataPresent = Boolean(e?.appId && e?.verificationUrl);
+  const expected = options?.expectedEigenAppId ?? DEFAULT_EIGEN_APP_ID;
+  const eigenAppIdMatchesExpected = Boolean(
+    e?.appId && e.appId.toLowerCase() === expected.toLowerCase()
+  );
+  return {
+    signatureValid,
+    teeFieldsPresent,
+    eigenMetadataPresent,
+    eigenAppIdMatchesExpected,
+    note:
+      'Mock TEE quotes in the demo are not verifiable on Eigen AVS. For production, run verification on EigenCompute and follow Eigen docs (Verify trust guarantees).',
+  };
+}
 
 interface VerifyRequestBody {
   imageBase64: string;
