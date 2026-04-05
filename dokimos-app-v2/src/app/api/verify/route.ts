@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
 import axios from "axios";
+import { authOptions } from "@/lib/authOptions";
 import { logApiError } from "@/lib/safeLog";
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -7,7 +9,7 @@ const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { imageBase64, requestedAttributes } = body;
+    const { imageBase64, livePhotoBase64, requestedAttributes } = body;
 
     // Validate input
     if (!imageBase64 || typeof imageBase64 !== "string") {
@@ -25,18 +27,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const session = await getServerSession(authOptions);
+    const userId = session?.user?.email ?? undefined;
+
     // Get TEE endpoint from server-side env (not exposed to frontend)
-    const TEE_ENDPOINT = process.env.TEE_ENDPOINT || "http://localhost:8082";
+    const TEE_ENDPOINT = process.env.TEE_ENDPOINT || "http://localhost:8080";
 
     // Call TEE service
     const response = await axios.post(
       `${TEE_ENDPOINT}/verify`,
       {
         imageBase64,
+        ...(typeof livePhotoBase64 === "string" && livePhotoBase64.length > 0
+          ? { livePhotoBase64 }
+          : {}),
         requestedAttributes: requestedAttributes || [],
+        ...(userId ? { userId } : {}),
       },
       {
-        timeout: 60000,
+        timeout: 120000,
         headers: {
           "Content-Type": "application/json",
         },

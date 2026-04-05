@@ -21,13 +21,13 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   pages: {
-    signIn: "/",
+    signIn: "/onboarding",
   },
   callbacks: {
     async signIn({ user }) {
       try {
         const response = await fetch(
-          `${process.env.TEE_ENDPOINT || "http://localhost:8082"}/api/auth/user/signup`,
+          `${process.env.TEE_ENDPOINT || "http://localhost:8080"}/api/auth/user/signup`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },

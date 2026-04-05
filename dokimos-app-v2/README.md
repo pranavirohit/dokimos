@@ -1,8 +1,26 @@
-# Dokimos Frontend
+# Dokimos App v2 (`dokimos-app-v2`)
 
-Beautiful mobile-first identity verification interface connected to TEE backend.
+Beautiful **mobile-first** identity verification UI: a **Next.js 14** app that talks to the **Fastify TEE backend** in the parent repo. The browser only talks to this Next.js origin; server-side **API routes** proxy to `TEE_ENDPOINT` so the TEE URL and keys stay off the client.
 
-## Quick Start
+## What’s in this folder
+
+| Area | Purpose |
+|------|--------|
+| `src/app/page.tsx` | Home: loads `DokimosFlow` (main 9-screen user journey). |
+| `src/components/DokimosFlow.tsx` | Consumer flow: intro, ID upload, liveness sim, vault, share/receipt, request history. |
+| `src/app/business/page.tsx` | Business / verifier demo dashboard (offline demo data, no login). |
+| `src/app/integration/page.tsx` | Integration / developer-oriented page. |
+| `src/app/api/*` | BFF routes: forward to Fastify (`/verify`, auth, requests, etc.). |
+| `src/lib/authOptions.ts` | NextAuth (Google); on sign-in, registers the user with the TEE `/api/auth/user/signup`. |
+
+## Stack
+
+- **Next.js** (App Router), **React 18**, **TypeScript**
+- **Tailwind CSS**, **Framer Motion** (screen transitions)
+- **NextAuth** + Google OAuth (end-user sign-in)
+- **Axios** for API calls from route handlers and client to same-origin `/api/*`
+
+## Quick start
 
 ```bash
 cd dokimos-app-v2
@@ -10,54 +28,90 @@ npm install
 npm run dev
 ```
 
-The dev server runs on **port 8081** (see `package.json`).
+Dev server: **http://localhost:8081** (`next dev -p 8081`).
 
-- App home: [http://localhost:8081](http://localhost:8081)
-- **Verifier login:** [http://localhost:8081/verifier/login](http://localhost:8081/verifier/login)
-- **Verifier dashboard:** [http://localhost:8081/verifier/dashboard](http://localhost:8081/verifier/dashboard)
-
-Run the Fastify API separately from the repo root (`npm run dev` in `dokimos-tee`, default **http://localhost:8080**). Point the frontend at it:
-
-## Environment Setup
-
-Copy `.env.example` to `.env.local` and configure:
-
-```env
-TEE_ENDPOINT=http://localhost:8080
-```
-
-Use your deployed API URL in production (example below is illustrative only):
-
-```env
-# TEE_ENDPOINT=https://your-api.example.com
-```
-
-## Troubleshooting
-
-**Dev server errors / “Cannot find module” / 500 on every route:**  
-Stale `.next` cache. From `dokimos-app-v2`:
+Run the **TEE API** from the **repository root** (not this folder):
 
 ```bash
-rm -rf .next
+cd ..   # dokimos-tee root
 npm run dev
 ```
 
-On Windows PowerShell: `Remove-Item -Recurse -Force .next` then `npm run dev`.
+Default TEE URL: **http://localhost:8080** (`PORT` in Fastify, see `src/index.ts` in the root).
 
-## Features
+Copy `.env.example` → `.env.local` and set `TEE_ENDPOINT` to match your running Fastify instance.
 
-- 9-screen animated flow
-- Real TEE backend integration
-- File upload with validation (JPG/PNG/WebP, max 10MB)
-- Liveness check simulation
-- Cryptographic attestation display
-- Verifier dashboard + “Verify This Check” wizard
-- Responsive design (mobile + desktop preview)
+## Environment variables
 
-## Deploy to Vercel
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `TEE_ENDPOINT` | Yes (for real flows) | Base URL of the Fastify backend (e.g. `http://localhost:8080`). |
+| `NEXTAUTH_URL` | Production | Public URL of this Next app (e.g. `http://localhost:8081` locally). |
+| `NEXTAUTH_SECRET` | Production | Secret for NextAuth session encryption. |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | For Google sign-in | OAuth credentials from Google Cloud Console. |
+| `EIGEN_APP_ID` | Optional | Overrides default Eigen app id for `/api/verify-attestation`. |
+
+See `.env.example` for copy-paste templates.
+
+## Routes (pages)
+
+| Path | Audience |
+|------|----------|
+| `/` | **End users** — Dokimos 9-screen flow (phone frame on desktop, full screen on mobile). |
+| `/business` | Business verifier dashboard demo (Overview, Verifications, Programs). |
+| `/integration` | Integration / product docs style page. |
+
+## API routes (BFF → TEE)
+
+Client code calls **same-origin** `/api/...`; route handlers use `TEE_ENDPOINT` to reach Fastify.
+
+| Next.js route | Role |
+|---------------|------|
+| `POST /api/verify` | ID image → TEE verification / attestation. |
+| `POST /api/request-verification` | Create a verification request (user ↔ verifier). |
+| `POST /api/approve-request` | Approve or deny a pending request. |
+| `GET /api/requests/user/[email]` | List requests for a user. |
+| `GET /api/requests/verifier/[id]` | List requests for a verifier. |
+| `POST /api/auth/verifier/login` / `.../signup` | Verifier auth against TEE. |
+| `POST /api/verify-attestation` | Attestation verification helper (uses shared logic + optional `EIGEN_APP_ID`). |
+| `GET/POST /api/auth/[...nextauth]` | NextAuth (Google). |
+
+## User flow (high level)
+
+1. **Screens 0–2** — Intro / marketing animation (auto-advance on early screens).
+2. **Google sign-in** — Optional; authenticated users skip intro and land on upload.
+3. **Upload → liveness (simulated) → vault** — `POST /api/verify` to the TEE.
+4. **Share / receipt / history** — Pending requests from `GET /api/requests/user/...`; approve/deny via `POST /api/approve-request`.
+
+On **desktop**, the UI is shown inside a fixed **phone-sized frame** with optional dev back/next controls; on **real mobile** it is full viewport.
+
+## Deploy (e.g. Vercel)
 
 ```bash
 vercel --prod
 ```
 
-Set `TEE_ENDPOINT` (and other secrets) in the Vercel project settings.
+Set **`TEE_ENDPOINT`** and **NextAuth** / **Google** secrets in the hosting project’s environment. Do not expose the TEE URL to the client as a public build-time variable unless you intend to; the app is designed to call the TEE **only from server routes**.
+
+## Troubleshooting
+
+**500s or “Cannot find module” after pulls:** clear the Next cache and restart.
+
+```bash
+# Unix
+rm -rf .next && npm run dev
+```
+
+```powershell
+# Windows PowerShell
+Remove-Item -Recurse -Force .next; npm run dev
+```
+
+## Features (summary)
+
+- 9-screen animated end-user flow  
+- TEE-backed verification and attestation display  
+- File upload validation (JPG/PNG/WebP, size limits)  
+- Liveness simulation  
+- Verifier dashboard and verification wizard  
+- Responsive: mobile viewport + desktop mockup frame  

@@ -21,7 +21,7 @@ export default function IntegrationPage() {
         <div className="max-w-7xl mx-auto px-6 py-6">
           <div className="flex items-center gap-3 mb-2">
             <Shield className="w-10 h-10 text-indigo-400" />
-            <h1 className="text-3xl font-bold text-white" style={{ fontFamily: "'Instrument Serif', serif" }}>
+            <h1 className="text-3xl font-bold text-white" style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}>
               Dokimos
             </h1>
           </div>
@@ -101,7 +101,7 @@ function WidgetTab({ copyToClipboard, copiedCode }: { copyToClipboard: (code: st
   const widgetCode = `<!-- Add to your signup page -->
 <script src="https://verify.dokimos.com/widget.js"></script>
 <div id="dokimos-verify" 
-     data-workflow="driver_background_check"
+     data-workflow="host_verification"
      data-api-key="your_api_key"
      data-callback="handleVerification">
 </div>
@@ -118,7 +118,7 @@ function WidgetTab({ copyToClipboard, copiedCode }: { copyToClipboard: (code: st
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-3xl font-bold text-white mb-3" style={{ fontFamily: "'Instrument Serif', serif" }}>
+        <h2 className="text-3xl font-bold text-white mb-3" style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}>
           Drop-in Widget Integration
         </h2>
         <p className="text-slate-300 text-lg">
@@ -197,13 +197,13 @@ function APITab({ copyToClipboard, copiedCode }: { copyToClipboard: (code: strin
     try {
       // Simulate a workflow-based API call (as if Uber's backend called this)
       const response = await axios.post('/api/request-verification', {
-        verifierId: 'verifier_001', // Acme Brokerage
+        verifierId: 'airbnb_prod',
         userEmail: 'pranavi@example.com',
         requestedAttributes: ['ageOver21', 'name', 'notExpired', 'documentType'],
-        workflow: 'driver_background_check'
+        workflow: 'host_verification'
       });
 
-      setTestResult(`✅ Workflow verification triggered!\n\nWorkflow: Driver Background Check\nRequest ID: ${response.data.requestId}\nUser: pranavi@example.com\n\nThe user will see this request in their Dokimos app.\nCheck the Verifier Dashboard to monitor status.`);
+      setTestResult(`✅ Workflow verification triggered!\n\nWorkflow: Host Verification\nRequest ID: ${response.data.requestId}\nUser: pranavi@example.com\n\nThe user will see this request in their Dokimos app.\nCheck the Verifier Dashboard to monitor status.`);
     } catch (error: any) {
       setTestResult(`❌ Error: ${error.response?.data?.error || error.message}`);
     } finally {
@@ -221,7 +221,7 @@ const response = await fetch('https://api.dokimos.com/verify', {
   body: JSON.stringify({
     userId: 'driver_12345',
     email: 'driver@example.com',
-    workflow: 'driver_background_check',
+    workflow: 'host_verification',
     callbackUrl: 'https://yourapp.com/webhooks/dokimos'
   })
 });
@@ -251,8 +251,8 @@ const verification = await response.json();
   },
   "eigen": {
     "verifier": "Eigen AVS",
-    "appId": "0x5911a27103C4de497fCB5C00D8e19962EEF0008E",
-    "verificationUrl": "https://verify-sepolia.eigencloud.xyz/app/0x5911a27103C4de497fCB5C00D8e19962EEF0008E",
+    "appId": "0x00658e70d8880910277592b3b41f9dd3fe4ce5fd",
+    "verificationUrl": "https://verify-sepolia.eigencloud.xyz/app/0x00658e70d8880910277592b3b41f9dd3fe4ce5fd",
     "verified": true,
     "verifiedAt": "2026-04-02T22:15:30.123Z"
   }
@@ -296,7 +296,7 @@ app.post('/webhooks/dokimos', async (req, res) => {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-3xl font-bold text-white mb-3" style={{ fontFamily: "'Instrument Serif', serif" }}>
+        <h2 className="text-3xl font-bold text-white mb-3" style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}>
           Server-Side API Integration
         </h2>
         <p className="text-slate-300 text-lg">
@@ -340,7 +340,7 @@ app.post('/webhooks/dokimos', async (req, res) => {
             <strong className="text-slate-200">What this simulates:</strong>
           </p>
           <p className="text-xs text-slate-400">
-            POST /api/request-verification with workflow "driver_background_check" for pranavi@example.com
+            POST /api/request-verification with workflow "host_verification" for pranavi@example.com (verifier airbnb_prod)
           </p>
           <p className="text-xs text-slate-400 mt-2">
             In production, this API call would be triggered automatically when a user signs up in your app (e.g., Uber driver signup flow).
@@ -459,7 +459,7 @@ function TrustTab() {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-3xl font-bold text-white mb-3" style={{ fontFamily: "'Instrument Serif', serif" }}>
+        <h2 className="text-3xl font-bold text-white mb-3" style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}>
           The Trust Model
         </h2>
         <p className="text-slate-300 text-lg">

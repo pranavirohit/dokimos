@@ -994,6 +994,1000 @@
           ]
         }
       ]
+    },
+    {
+      "type": "frame",
+      "id": "WFHh3",
+      "x": -667,
+      "y": -542.0000045776369,
+      "name": "intro1",
+      "width": 390,
+      "height": 844,
+      "fill": "#0F1B4C",
+      "layout": "vertical",
+      "padding": [
+        0,
+        32
+      ],
+      "justifyContent": "center",
+      "alignItems": "center",
+      "children": [
+        {
+          "type": "text",
+          "id": "L4wh7",
+          "name": "headAgain",
+          "fill": "#FFFFFF",
+          "content": "Again?",
+          "textAlign": "center",
+          "fontFamily": "Instrument Serif",
+          "fontSize": 64,
+          "fontWeight": "700"
+        },
+        {
+          "type": "frame",
+          "id": "5mYdg",
+          "name": "pillStrip",
+          "gap": 8,
+          "padding": [
+            32,
+            0
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "I3zaD",
+              "name": "pill1",
+              "height": 32,
+              "fill": "#ffffff26",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#ffffff33"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "VqCLn",
+                  "name": "pill1t",
+                  "fill": "#ffffffe6",
+                  "content": "new bank account",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "EYpqe",
+              "name": "pill2",
+              "height": 32,
+              "fill": "#ffffff26",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#ffffff33"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "28Cc0",
+                  "name": "pill2t",
+                  "fill": "#ffffffe6",
+                  "content": "apartment rental",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "rtZnl",
+              "name": "pill3",
+              "height": 32,
+              "fill": "#ffffff26",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#ffffff33"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "fyagf",
+                  "name": "pill3t",
+                  "fill": "#ffffffe6",
+                  "content": "freelance platform",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "res9C",
+              "name": "pill4",
+              "height": 32,
+              "fill": "#ffffff26",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#ffffff33"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "cZ9XW",
+                  "name": "pill4t",
+                  "fill": "#ffffffe6",
+                  "content": "car rental",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "64GhE",
+              "name": "pill5",
+              "height": 32,
+              "fill": "#ffffff26",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#ffffff33"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "OBB28",
+                  "name": "pill5t",
+                  "fill": "#ffffffe6",
+                  "content": "background check",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "gbCtp",
+              "name": "pill6",
+              "height": 32,
+              "fill": "#ffffff26",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#ffffff33"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "l1qBn",
+                  "name": "pill6t",
+                  "fill": "#ffffffe6",
+                  "content": "gig company",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "hxVQS",
+      "x": -667,
+      "y": -542.0000045776369,
+      "name": "intro2",
+      "width": 390,
+      "height": 844,
+      "fill": "#0F1B4C",
+      "layout": "vertical",
+      "padding": [
+        0,
+        32
+      ],
+      "justifyContent": "center",
+      "alignItems": "center",
+      "children": [
+        {
+          "type": "text",
+          "id": "HUtlE",
+          "name": "headAgain",
+          "fill": "#FFFFFF",
+          "content": "Again?",
+          "textAlign": "center",
+          "fontFamily": "Instrument Serif",
+          "fontSize": 64,
+          "fontWeight": "700"
+        },
+        {
+          "type": "frame",
+          "id": "bN24S",
+          "name": "pillStrip",
+          "gap": 8,
+          "padding": [
+            32,
+            0
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "q93BH",
+              "name": "pill1",
+              "height": 32,
+              "fill": "#ffffff26",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#ffffff33"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "8vHGO",
+                  "name": "pill1t",
+                  "fill": "#ffffffe6",
+                  "content": "new bank account",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "PWrAu",
+              "name": "pill2",
+              "height": 32,
+              "fill": "#ffffff26",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#ffffff33"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Y0s7c",
+                  "name": "pill2t",
+                  "fill": "#ffffffe6",
+                  "content": "apartment rental",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "DbXY1",
+              "name": "pill3",
+              "height": 32,
+              "fill": "#ffffff26",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#ffffff33"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "QKa9S",
+                  "name": "pill3t",
+                  "fill": "#ffffffe6",
+                  "content": "freelance platform",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "RAZ2r",
+              "name": "pill4",
+              "height": 32,
+              "fill": "#ffffff26",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#ffffff33"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "MxiJD",
+                  "name": "pill4t",
+                  "fill": "#ffffffe6",
+                  "content": "car rental",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "T8AZt",
+              "name": "pill5",
+              "height": 32,
+              "fill": "#ffffff26",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#ffffff33"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "yRVLC",
+                  "name": "pill5t",
+                  "fill": "#ffffffe6",
+                  "content": "background check",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "gqzHl",
+              "name": "pill6",
+              "height": 32,
+              "fill": "#ffffff26",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#ffffff33"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "7bgRG",
+                  "name": "pill6t",
+                  "fill": "#ffffffe6",
+                  "content": "gig company",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "NKauO",
+      "x": -200,
+      "y": -542.0000045776369,
+      "name": "intro3",
+      "width": 390,
+      "height": 844,
+      "fill": "#0F1B4C",
+      "layout": "vertical",
+      "padding": [
+        0,
+        32
+      ],
+      "justifyContent": "center",
+      "alignItems": "center",
+      "children": [
+        {
+          "type": "text",
+          "id": "gnESL",
+          "name": "headAgain",
+          "fill": "#FFFFFF",
+          "content": "Meet Dokimos.",
+          "textAlign": "center",
+          "fontFamily": "Instrument Serif",
+          "fontSize": 64,
+          "fontWeight": "700"
+        },
+        {
+          "type": "frame",
+          "id": "TcB20",
+          "name": "pillStrip",
+          "gap": 8,
+          "padding": [
+            32,
+            0
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "MOHeY",
+              "name": "pill1",
+              "height": 32,
+              "fill": "#ffffff26",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#ffffff33"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "KDTW9",
+                  "name": "pill1t",
+                  "fill": "#ffffffe6",
+                  "content": "new bank account",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "nwQDf",
+              "name": "pill2",
+              "height": 32,
+              "fill": "#ffffff26",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#ffffff33"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "1ZVfC",
+                  "name": "pill2t",
+                  "fill": "#ffffffe6",
+                  "content": "apartment rental",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "QAqXZ",
+              "name": "pill3",
+              "height": 32,
+              "fill": "#ffffff26",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#ffffff33"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "vugG9",
+                  "name": "pill3t",
+                  "fill": "#ffffffe6",
+                  "content": "freelance platform",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "Fp6rZ",
+              "name": "pill4",
+              "height": 32,
+              "fill": "#ffffff26",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#ffffff33"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "zonYk",
+                  "name": "pill4t",
+                  "fill": "#ffffffe6",
+                  "content": "car rental",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "yBpXV",
+              "name": "pill5",
+              "height": 32,
+              "fill": "#ffffff26",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#ffffff33"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "ayruh",
+                  "name": "pill5t",
+                  "fill": "#ffffffe6",
+                  "content": "background check",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "kXpwp",
+              "name": "pill6",
+              "height": 32,
+              "fill": "#ffffff26",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#ffffff33"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "2x1Wh",
+                  "name": "pill6t",
+                  "fill": "#ffffffe6",
+                  "content": "gig company",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "KIS47",
+      "x": 277,
+      "y": -542.0000045776369,
+      "name": "intro4",
+      "width": 390,
+      "height": 844,
+      "fill": "#0F1B4C",
+      "layout": "none",
+      "children": [
+        {
+          "type": "text",
+          "id": "HI9HB",
+          "x": 32,
+          "y": 303.0000045776369,
+          "name": "headAgain",
+          "fill": "#FFFFFF",
+          "textGrowth": "fixed-width",
+          "width": 327,
+          "content": "The last time you'll ever have to upload your ID.",
+          "fontFamily": "Instrument Serif",
+          "fontSize": 40,
+          "fontWeight": "700"
+        },
+        {
+          "type": "frame",
+          "id": "h6GIs",
+          "x": 0,
+          "y": 415.5,
+          "name": "pillStrip",
+          "gap": 8,
+          "padding": [
+            32,
+            0
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "XjFeX",
+              "name": "pill1",
+              "height": 32,
+              "fill": "#ffffff26",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#ffffff33"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "trzQL",
+                  "name": "pill1t",
+                  "fill": "#ffffffe6",
+                  "content": "new bank account",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "CArR2",
+              "name": "pill2",
+              "height": 32,
+              "fill": "#ffffff26",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#ffffff33"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Gb9PC",
+                  "name": "pill2t",
+                  "fill": "#ffffffe6",
+                  "content": "apartment rental",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "JIKDj",
+              "name": "pill3",
+              "height": 32,
+              "fill": "#ffffff26",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#ffffff33"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "gVYsF",
+                  "name": "pill3t",
+                  "fill": "#ffffffe6",
+                  "content": "freelance platform",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "Cs3Lj",
+              "name": "pill4",
+              "height": 32,
+              "fill": "#ffffff26",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#ffffff33"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "frzB1",
+                  "name": "pill4t",
+                  "fill": "#ffffffe6",
+                  "content": "car rental",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "fGolM",
+              "name": "pill5",
+              "height": 32,
+              "fill": "#ffffff26",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#ffffff33"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "ct1iw",
+                  "name": "pill5t",
+                  "fill": "#ffffffe6",
+                  "content": "background check",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "JoVf6",
+              "name": "pill6",
+              "height": 32,
+              "fill": "#ffffff26",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#ffffff33"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "qnQAK",
+                  "name": "pill6t",
+                  "fill": "#ffffffe6",
+                  "content": "gig company",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "JBbPs",
+          "x": 32,
+          "y": 599.0000045776369,
+          "name": "bottomSheet",
+          "width": 332,
+          "height": 245,
+          "fill": "#FFFFFF",
+          "cornerRadius": [
+            24,
+            24,
+            0,
+            0
+          ],
+          "layout": "vertical",
+          "gap": 24,
+          "padding": [
+            32,
+            24,
+            40,
+            24
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "sOd9f",
+              "name": "sheetHead",
+              "fill": "#111827",
+              "content": "Get started with Dokimos",
+              "textAlign": "center",
+              "fontFamily": "Instrument Sans",
+              "fontSize": 22,
+              "fontWeight": "700"
+            },
+            {
+              "type": "frame",
+              "id": "VFSSW",
+              "name": "signUpBtn",
+              "width": "fill_container",
+              "height": 56,
+              "fill": "#4F46E5",
+              "cornerRadius": 12,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "buuWD",
+                  "name": "signUpText",
+                  "fill": "#FFFFFF",
+                  "content": "Sign up",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 16,
+                  "fontWeight": "700"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "WxZbv",
+              "name": "logInBtn",
+              "width": "fill_container",
+              "height": 56,
+              "fill": "#F3F4F6",
+              "cornerRadius": 12,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "FDMLg",
+                  "name": "logInText",
+                  "fill": "#111827",
+                  "content": "Log in",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 16,
+                  "fontWeight": "700"
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   ]
 }

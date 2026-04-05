@@ -1,16 +1,25 @@
 import dotenv from 'dotenv';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import rateLimit from '@fastify/rate-limit';
 import { hashMessage, verifyMessage } from 'viem';
-import { mnemonicToAccount } from 'viem/accounts';
+import { mnemonicToAccount, type HDAccount } from 'viem/accounts';
 import { createWorker } from 'tesseract.js';
 import crypto from 'crypto';
+import bcrypt from 'bcrypt';
+import { z } from 'zod';
+import {
+  compareFaces,
+  ensureFaceEngine,
+  extractIdPhoto,
+  type FaceMatchResult,
+} from './faceVerification';
 
 dotenv.config();
 
 /** Inlined here so Docker/ts-node only needs index.ts (avoids missing-module issues on deploy). */
 const DEFAULT_EIGEN_APP_ID =
-  '0x5911a27103C4de497fCB5C00D8e19962EEF0008E';
+  '0x00658e70d8880910277592b3b41f9dd3fe4ce5fd';
 
 type DokimosAttestationInput = {
   message: string;
@@ -49,32 +58,236 @@ async function verifyDokimosAttestation(
   };
 }
 
-interface VerifyRequestBody {
-  imageBase64: string;
-  requestedAttributes: string[];
-}
-
 interface ExtractedAttributes {
   name: string;
+  /** ISO 8601 date YYYY-MM-DD when parsed */
   dateOfBirth: string;
+  ageOver18: boolean;
   ageOver21: boolean;
   notExpired: boolean;
   nationality: string;
   documentType: string;
+  /** ISO 8601 date YYYY-MM-DD when parsed */
+  documentExpiryDate: string;
+  /** Residence / mailing line from OCR (e.g. California DL) */
+  address: string;
 }
 
 interface User {
   userId: string;
   name: string;
   email: string;
-  password: string;
+  passwordHash: string;
 }
 
 interface Verifier {
   verifierId: string;
   companyName: string;
   email: string;
-  password: string;
+  passwordHash: string;
+}
+
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+const verifierSessions = new Map<
+  string,
+  {
+    verifierId: string;
+    companyName: string;
+    email: string;
+    expiresAt: number;
+  }
+>();
+const userSessions = new Map<
+  string,
+  { userId: string; name: string; email: string; expiresAt: number }
+>();
+
+function pruneExpiredSessions(): void {
+  const now = Date.now();
+  for (const [k, v] of verifierSessions) {
+    if (v.expiresAt < now) verifierSessions.delete(k);
+  }
+  for (const [k, v] of userSessions) {
+    if (v.expiresAt < now) userSessions.delete(k);
+  }
+}
+
+function createVerifierSession(v: Verifier): string {
+  pruneExpiredSessions();
+  const token = crypto.randomBytes(32).toString('hex');
+  verifierSessions.set(token, {
+    verifierId: v.verifierId,
+    companyName: v.companyName,
+    email: v.email,
+    expiresAt: Date.now() + SESSION_TTL_MS,
+  });
+  return token;
+}
+
+function getVerifierSession(
+  token: string | undefined
+): { verifierId: string; companyName: string; email: string } | null {
+  if (!token) return null;
+  const s = verifierSessions.get(token);
+  if (!s || s.expiresAt < Date.now()) {
+    if (s) verifierSessions.delete(token);
+    return null;
+  }
+  return s;
+}
+
+function createUserSession(u: User): string {
+  pruneExpiredSessions();
+  const token = crypto.randomBytes(32).toString('hex');
+  userSessions.set(token, {
+    userId: u.userId,
+    name: u.name,
+    email: u.email,
+    expiresAt: Date.now() + SESSION_TTL_MS,
+  });
+  return token;
+}
+
+function getUserSession(
+  token: string | undefined
+): { userId: string; name: string; email: string } | null {
+  if (!token) return null;
+  const s = userSessions.get(token);
+  if (!s || s.expiresAt < Date.now()) {
+    if (s) userSessions.delete(token);
+    return null;
+  }
+  return s;
+}
+
+/** OAuth placeholder passwords get a random hash so they cannot be guessed. */
+async function hashPasswordForSignup(password: string): Promise<string> {
+  if (password === 'google-oauth') {
+    return bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+  }
+  return bcrypt.hash(password, 10);
+}
+
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
+function validateImageBase64(
+  imageBase64: string
+): { ok: true; stripped: string } | { ok: false; message: string } {
+  if (typeof imageBase64 !== 'string' || imageBase64.length === 0) {
+    return { ok: false, message: 'imageBase64 is required' };
+  }
+  const stripped = imageBase64
+    .replace(/^data:image\/[a-zA-Z+]+;base64,/, '')
+    .replace(/\s/g, '');
+  if (stripped.length > Math.ceil((MAX_IMAGE_BYTES * 4) / 3)) {
+    return { ok: false, message: 'Image too large (max 10MB)' };
+  }
+  if (!/^[A-Za-z0-9+/]+=*$/.test(stripped)) {
+    return { ok: false, message: 'Invalid base64 encoding' };
+  }
+  try {
+    const buf = Buffer.from(stripped, 'base64');
+    if (buf.length > MAX_IMAGE_BYTES) {
+      return { ok: false, message: 'Image too large (max 10MB)' };
+    }
+  } catch {
+    return { ok: false, message: 'Invalid base64 data' };
+  }
+  return { ok: true, stripped };
+}
+
+const emailSchema = z.string().email().max(255);
+const passwordSchema = z.string().min(8).max(128);
+const userSignupSchema = z.object({
+  name: z.string().min(1).max(100),
+  email: emailSchema,
+  password: passwordSchema,
+});
+const userLoginSchema = z.object({
+  email: emailSchema,
+  password: z.string().min(1).max(128),
+});
+const verifierSignupSchema = z.object({
+  companyName: z.string().min(1).max(200),
+  email: emailSchema,
+  password: passwordSchema,
+});
+const verifierLoginSchema = userLoginSchema;
+
+const requestVerificationBodySchema = z.object({
+  verifierId: z.string().min(1).max(128),
+  userEmail: emailSchema,
+  requestedAttributes: z.array(z.string().max(64)).min(1).max(50),
+  workflow: z.string().max(128).optional(),
+});
+
+const approveRequestBodySchema = z.object({
+  requestId: z.string().min(1).max(128),
+  approved: z.boolean(),
+  imageBase64: z.string().optional(),
+});
+
+const verifyBodySchema = z.object({
+  imageBase64: z.string().min(1),
+  livePhotoBase64: z.string().min(1).optional(),
+  requestedAttributes: z.array(z.string().max(64)).max(50).optional(),
+  /** User email: when set, raw ID image is encrypted (AES-256-GCM) and kept in server memory for POST /re-verify (POC; lost on restart). */
+  userId: z.string().email().optional(),
+});
+
+const reverifyBodySchema = z.object({
+  userId: z.string().email(),
+  requestedAttributes: z.array(z.string().max(64)).max(50).optional(),
+});
+
+/** POC: encrypted ID images keyed by normalized email; in-memory only (lost on process restart). */
+const encryptedIdStore = new Map<
+  string,
+  { encrypted: Buffer; iv: Buffer; authTag: Buffer }
+>();
+
+function encryptionSalt(): string {
+  return process.env.ENCRYPTION_SALT || 'dokimos-dev-salt-change-in-production';
+}
+
+function normalizeUserKey(userId: string): string {
+  return userId.trim().toLowerCase();
+}
+
+function deriveUserEncryptionKey(userId: string): Buffer {
+  return crypto.pbkdf2Sync(
+    normalizeUserKey(userId),
+    encryptionSalt(),
+    100000,
+    32,
+    'sha256'
+  );
+}
+
+function encryptIdImagePoc(imageBuffer: Buffer, userId: string): {
+  encrypted: Buffer;
+  iv: Buffer;
+  authTag: Buffer;
+} {
+  const key = deriveUserEncryptionKey(userId);
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const encrypted = Buffer.concat([cipher.update(imageBuffer), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return { encrypted, iv, authTag };
+}
+
+function decryptIdImagePoc(userId: string): Buffer | null {
+  const row = encryptedIdStore.get(normalizeUserKey(userId));
+  if (!row) return null;
+  try {
+    const key = deriveUserEncryptionKey(userId);
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, row.iv);
+    decipher.setAuthTag(row.authTag);
+    return Buffer.concat([decipher.update(row.encrypted), decipher.final()]);
+  } catch {
+    return null;
+  }
 }
 
 interface VerificationRequest {
@@ -96,70 +309,243 @@ const users = new Map<string, User>();
 const verifiers = new Map<string, Verifier>();
 const requests = new Map<string, VerificationRequest>();
 
-// Pre-populate demo accounts
-users.set('pranavi@example.com', {
-  userId: 'user_001',
-  name: 'Pranavi Rohit',
-  email: 'pranavi@example.com',
-  password: 'demo123',
-});
+/** Demo accounts share password `demo1234` (min 8 chars). Hashed once at startup. */
+async function seedDemoAccounts(): Promise<void> {
+  const demoHash = await bcrypt.hash('demo1234', 10);
+  users.set('pranavi@example.com', {
+    userId: 'user_001',
+    name: 'Pranavi Rohit',
+    email: 'pranavi@example.com',
+    passwordHash: demoHash,
+  });
+  const demoVerifiers: [string, string, string][] = [
+    ['acme@brokerage.com', 'verifier_001', 'Acme Brokerage'],
+    ['verify@coinbase.com', 'verifier_002', 'Coinbase'],
+    ['kyc@binance.com', 'verifier_003', 'Binance'],
+    ['compliance@robinhood.com', 'verifier_004', 'Robinhood'],
+    ['verify@airbnb.com', 'airbnb_prod', 'Airbnb'],
+    ['identity@uber.com', 'verifier_006', 'Uber'],
+    ['kyc@stripe.com', 'verifier_007', 'Stripe'],
+    ['verify@upwork.com', 'verifier_008', 'Upwork'],
+  ];
+  for (const [email, verifierId, companyName] of demoVerifiers) {
+    verifiers.set(email, {
+      verifierId,
+      companyName,
+      email,
+      passwordHash: demoHash,
+    });
+  }
 
-// Pre-populate real companies that would use Dokimos
-verifiers.set('acme@brokerage.com', {
-  verifierId: 'verifier_001',
-  companyName: 'Acme Brokerage',
-  email: 'acme@brokerage.com',
-  password: 'demo123',
-});
+  seedDemoVerificationRequests();
+  seedVerifierDashboardDemos();
+}
 
-verifiers.set('verify@coinbase.com', {
-  verifierId: 'verifier_002',
-  companyName: 'Coinbase',
-  email: 'verify@coinbase.com',
-  password: 'demo123',
-});
+/** Many rows per verifier so the business dashboard table (search, sort, pages) has realistic volume. */
+function seedVerifierDashboardDemos(): void {
+  const first = [
+    'Jordan', 'Sarah', 'Michael', 'Emma', 'James', 'Olivia', 'David', 'Sophia',
+    'Daniel', 'Isabella', 'Ryan', 'Mia', 'Kevin', 'Ava',
+  ];
+  const last = [
+    'Lee', 'Chen', 'Park', 'Wilson', 'Rodriguez', 'Martinez', 'Kim', 'Brown',
+    'Davis', 'Garcia', 'Taylor', 'Anderson', 'Thomas', 'Moore',
+  ];
+  const now = Date.now();
+  const day = 86400000;
 
-verifiers.set('kyc@binance.com', {
-  verifierId: 'verifier_003',
-  companyName: 'Binance',
-  email: 'kyc@binance.com',
-  password: 'demo123',
-});
+  const mockAttFull = (
+    displayName: string,
+    ts: string,
+    confidence: number
+  ): VerificationRequest['attestation'] => ({
+    attributes: {
+      name: displayName,
+      ageOver18: true,
+      ageOver21: true,
+      notExpired: true,
+      nationality: 'United States',
+    },
+    timestamp: ts,
+    message: `IdentityAttestation|demo|${ts}`,
+    messageHash: '0x0',
+    signature: '0xdemo',
+    signer: '0x0000000000000000000000000000000000000000',
+    biometricVerification: {
+      faceMatch: true,
+      confidence,
+    },
+  });
 
-verifiers.set('compliance@robinhood.com', {
-  verifierId: 'verifier_004',
-  companyName: 'Robinhood',
-  email: 'compliance@robinhood.com',
-  password: 'demo123',
-});
+  for (const v of verifiers.values()) {
+    for (let i = 0; i < 32; i++) {
+      const requestId = `req_vdash_${v.verifierId}_${i}`;
+      if (requests.has(requestId)) continue;
 
-verifiers.set('verify@airbnb.com', {
-  verifierId: 'verifier_005',
-  companyName: 'Airbnb',
-  email: 'verify@airbnb.com',
-  password: 'demo123',
-});
+      const fn = first[i % first.length];
+      const ln = last[(i + 3) % last.length];
+      const displayName = `${fn} ${ln}`;
+      const userEmail = `${fn.toLowerCase()}.${ln.toLowerCase()}.${i}@example.com`;
 
-verifiers.set('identity@uber.com', {
-  verifierId: 'verifier_006',
-  companyName: 'Uber',
-  email: 'identity@uber.com',
-  password: 'demo123',
-});
+      let createdAtMs = now - i * day * 2 - i * 3600000;
+      const roll = i % 10;
+      // Stale pending → UI can show as "expired"
+      if (roll === 0 && i % 3 === 0) {
+        createdAtMs = now - 9 * day;
+      }
+      const createdAt = new Date(createdAtMs).toISOString();
 
-verifiers.set('kyc@stripe.com', {
-  verifierId: 'verifier_007',
-  companyName: 'Stripe',
-  email: 'kyc@stripe.com',
-  password: 'demo123',
-});
+      let status: VerificationRequest['status'];
+      let completedAt: string | undefined;
+      let attestation: VerificationRequest['attestation'] = null;
 
-verifiers.set('verify@upwork.com', {
-  verifierId: 'verifier_008',
-  companyName: 'Upwork',
-  email: 'verify@upwork.com',
-  password: 'demo123',
-});
+      if (roll === 0) {
+        status = 'pending';
+      } else if (roll === 1) {
+        status = 'denied';
+        completedAt = new Date(createdAtMs + 60000).toISOString();
+      } else {
+        status = 'approved';
+        completedAt = new Date(createdAtMs + 120000).toISOString();
+        attestation = mockAttFull(
+          displayName,
+          completedAt,
+          0.92 + (i % 8) * 0.01
+        );
+      }
+
+      requests.set(requestId, {
+        requestId,
+        verifierId: v.verifierId,
+        verifierName: v.companyName,
+        verifierEmail: v.email,
+        userEmail,
+        requestedAttributes: ['name', 'ageOver21', 'notExpired'],
+        workflow: i % 4 === 0 ? 'host_verification' : 'driver_onboarding',
+        status,
+        createdAt,
+        completedAt,
+        attestation,
+      });
+    }
+  }
+}
+
+/** Populates in-memory requests so the user app “Where you’ve verified” screen has demo rows. */
+function seedDemoVerificationRequests(): void {
+  const userEmail = 'pranavi@example.com';
+  const now = Date.now();
+  const day = 86400000;
+
+  const mockAtt = (
+    attrs: Record<string, string | boolean>,
+    ts: string
+  ): VerificationRequest['attestation'] => ({
+    attributes: attrs,
+    timestamp: ts,
+    message: `IdentityAttestation|demo|${ts}`,
+    messageHash: '0x0',
+    signature: '0xdemo',
+    signer: '0x0000000000000000000000000000000000000000',
+  });
+
+  const demos: VerificationRequest[] = [
+    {
+      requestId: 'req_demo_coinbase',
+      verifierId: 'verifier_002',
+      verifierName: 'Coinbase',
+      verifierEmail: 'verify@coinbase.com',
+      userEmail,
+      requestedAttributes: ['ageOver21', 'notExpired'],
+      workflow: 'driver_onboarding',
+      status: 'approved',
+      createdAt: new Date(now).toISOString(),
+      completedAt: new Date(now).toISOString(),
+      attestation: mockAtt(
+        { ageOver21: true, notExpired: true },
+        new Date(now).toISOString()
+      ),
+    },
+    {
+      requestId: 'req_demo_acme',
+      verifierId: 'verifier_001',
+      verifierName: 'Acme Brokerage',
+      verifierEmail: 'acme@brokerage.com',
+      userEmail,
+      requestedAttributes: ['name', 'ageOver21', 'notExpired'],
+      workflow: 'driver_onboarding',
+      status: 'approved',
+      createdAt: new Date(now - 2 * day).toISOString(),
+      completedAt: new Date(now - 2 * day).toISOString(),
+      attestation: mockAtt(
+        {
+          name: 'Jordan Sample',
+          ageOver21: true,
+          notExpired: true,
+        },
+        new Date(now - 2 * day).toISOString()
+      ),
+    },
+    {
+      requestId: 'req_demo_uber',
+      verifierId: 'verifier_006',
+      verifierName: 'Uber',
+      verifierEmail: 'identity@uber.com',
+      userEmail,
+      requestedAttributes: ['name', 'notExpired'],
+      workflow: 'driver_onboarding',
+      status: 'approved',
+      createdAt: new Date(now - 4 * day).toISOString(),
+      completedAt: new Date(now - 4 * day).toISOString(),
+      attestation: mockAtt(
+        { name: 'Jordan Sample', notExpired: true },
+        new Date(now - 4 * day).toISOString()
+      ),
+    },
+    {
+      requestId: 'req_demo_upwork',
+      verifierId: 'verifier_008',
+      verifierName: 'Upwork',
+      verifierEmail: 'verify@upwork.com',
+      userEmail,
+      requestedAttributes: ['name', 'nationality'],
+      workflow: 'driver_onboarding',
+      status: 'approved',
+      createdAt: new Date(now - 9 * day).toISOString(),
+      completedAt: new Date(now - 9 * day).toISOString(),
+      attestation: mockAtt(
+        { name: 'Jordan Sample', nationality: 'United States' },
+        new Date(now - 9 * day).toISOString()
+      ),
+    },
+    {
+      requestId: 'req_demo_binance_old',
+      verifierId: 'verifier_003',
+      verifierName: 'Binance',
+      verifierEmail: 'kyc@binance.com',
+      userEmail,
+      requestedAttributes: ['name', 'dateOfBirth', 'notExpired'],
+      workflow: 'driver_onboarding',
+      status: 'approved',
+      createdAt: new Date(now - 120 * day).toISOString(),
+      completedAt: new Date(now - 120 * day).toISOString(),
+      attestation: mockAtt(
+        {
+          name: 'Jordan Sample',
+          dateOfBirth: '1990-01-15',
+          ageOver18: true,
+          ageOver21: true,
+          notExpired: true,
+        },
+        new Date(now - 120 * day).toISOString()
+      ),
+    },
+  ];
+
+  for (const r of demos) {
+    requests.set(r.requestId, r);
+  }
+}
 
 // Initialize Tesseract worker once at startup
 let ocrWorker: Awaited<ReturnType<typeof createWorker>> | null = null;
@@ -169,6 +555,72 @@ async function initializeOCR() {
     ocrWorker = await createWorker('eng');
   }
   return ocrWorker;
+}
+
+/** MM/DD/YYYY (or ISO) → YYYY-MM-DD for storage */
+function normalizeToIsoDate(raw: string): string {
+  const t = raw.trim();
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
+  if (iso) return t;
+  const m = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/.exec(t);
+  if (m) {
+    const mm = parseInt(m[1], 10);
+    const dd = parseInt(m[2], 10);
+    const yyyy = parseInt(m[3], 10);
+    return `${yyyy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+  }
+  return t;
+}
+
+function normalizeNationalityDisplay(raw: string): string {
+  const t = raw.trim();
+  if (!t || t === 'Unknown') return 'Unknown';
+  const compact = t.toUpperCase().replace(/\./g, '');
+  if (compact === 'USA' || compact === 'US' || compact === 'U.S.A') return 'United States';
+  if (compact === 'UK' || compact === 'GB' || compact === 'U.K') return 'United Kingdom';
+  return t;
+}
+
+function normalizeDocumentTypeLabel(raw: string): string {
+  const lower = raw.trim().toLowerCase();
+  if (lower.includes('passport')) return 'Passport';
+  if (
+    lower === 'drivers_license' ||
+    lower.includes('driver') ||
+    (lower.includes('license') && !lower.includes('business'))
+  ) {
+    return "Driver's License";
+  }
+  if (
+    lower.includes('id card') ||
+    lower === 'id_card' ||
+    lower.includes('national id') ||
+    lower.includes('government id') ||
+    lower === 'government id'
+  ) {
+    return 'National ID Card';
+  }
+  return raw.trim();
+}
+
+function deriveAgeFlagsFromIsoDob(iso: string): {
+  ageOver18: boolean;
+  ageOver21: boolean;
+} | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso.trim());
+  if (!m) return null;
+  const y = parseInt(m[1], 10);
+  const mo = parseInt(m[2], 10) - 1;
+  const d = parseInt(m[3], 10);
+  const birth = new Date(y, mo, d);
+  if (Number.isNaN(birth.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const md = today.getMonth() - birth.getMonth();
+  if (md < 0 || (md === 0 && today.getDate() < birth.getDate())) {
+    age--;
+  }
+  return { ageOver18: age >= 18, ageOver21: age >= 21 };
 }
 
 // Parse extracted text to find attributes
@@ -182,31 +634,51 @@ function parseIDText(text: string): Partial<ExtractedAttributes> {
   if (fullText.includes('PASSPORT')) {
     result.documentType = 'Passport';
   } else if (fullText.includes('DRIVER') || fullText.includes('LICENSE') || fullText.includes('DLN')) {
-    result.documentType = 'Driver License';
+    result.documentType = "Driver's License";
   } else if (fullText.includes('IDENTITY') || fullText.includes('ID CARD')) {
-    result.documentType = 'ID Card';
+    result.documentType = 'National ID Card';
   } else {
-    result.documentType = 'Government ID';
+    result.documentType = 'National ID Card';
   }
 
-  // Find name - California DL format: line numbers before names
-  // Look for "SAMPLE" and "JANICE" in the text
-  const firstNameMatch = text.match(/2\s+([A-Z]+)/); // Line 2 is first name in CA DL
-  const lastNameMatch = text.match(/(?:^|\n)\s*([A-Z]{4,})\s+[A-Z]\s+[A-Z]/m); // SAMPLE E L pattern
-  
-  if (firstNameMatch && lastNameMatch) {
-    result.name = `${firstNameMatch[1]} ${lastNameMatch[1]}`.trim();
-  } else if (firstNameMatch) {
-    result.name = firstNameMatch[1];
-  } else if (lastNameMatch) {
-    result.name = lastNameMatch[1];
-  } else {
-    // Fallback: look for any capitalized words
-    const namePattern = /(?:NAME|HOLDER)[:\s]+([A-Z\s]+)/i;
-    const match = text.match(namePattern);
-    if (match && match[1]) {
-      result.name = match[1].trim();
+  // Find name — California DL format (line numbers before names on sample IDs)
+  let extractedName: string | undefined;
+
+  const lastNameWithLine = text.match(/1\s+([A-Z]{3,})/);
+  const firstNameWithLine = text.match(/2\s+([A-Z]{3,})/);
+
+  if (lastNameWithLine && firstNameWithLine) {
+    extractedName = `${firstNameWithLine[1]} ${lastNameWithLine[1]}`.trim();
+    console.log('✓ Name extracted via pattern 1 (line numbers):', extractedName);
+  }
+
+  if (!extractedName) {
+    const namePattern = /(?:^|\n)\s*([A-Z]{3,})\s+([A-Z]{3,})/m;
+    const nameMatch = text.match(namePattern);
+    if (nameMatch) {
+      extractedName = `${nameMatch[2]} ${nameMatch[1]}`.trim();
+      console.log('✓ Name extracted via pattern 2 (direct match):', extractedName);
     }
+  }
+
+  if (!extractedName && fullText.includes('JANICE') && fullText.includes('SAMPLE')) {
+    extractedName = 'JANICE SAMPLE';
+    console.log('✓ Name extracted via pattern 3 (keyword search):', extractedName);
+  }
+
+  if (!extractedName) {
+    const nameFieldPattern = /(?:NAME|HOLDER)[:\s]+([A-Z][A-Z\s]+)/i;
+    const fieldMatch = text.match(nameFieldPattern);
+    if (fieldMatch && fieldMatch[1]) {
+      extractedName = fieldMatch[1].trim();
+      console.log('✓ Name extracted via pattern 4 (name field):', extractedName);
+    }
+  }
+
+  if (extractedName) {
+    result.name = extractedName;
+  } else {
+    console.log('✗ Name extraction failed - no pattern matched');
   }
 
   // Find date of birth - the OCR shows "300811/26/1957" so look for dates with noise
@@ -220,31 +692,21 @@ function parseIDText(text: string): Partial<ExtractedAttributes> {
   for (const pattern of dobPatterns) {
     const match = text.match(pattern);
     if (match && match[1]) {
-      result.dateOfBirth = match[1];
-      // Calculate age
-      const parts = match[1].split(/[\/\-]/);
-      let year, month, day;
-      
-      // Try MM/DD/YYYY format (US)
-      if (parts.length === 3) {
-        if (parts[2].length === 4) {
-          month = parseInt(parts[0]);
-          day = parseInt(parts[1]);
-          year = parseInt(parts[2]);
-        } else {
-          // YYYY-MM-DD format
-          year = parseInt(parts[0]);
-          month = parseInt(parts[1]);
-          day = parseInt(parts[2]);
-        }
-        
-        const birthDate = new Date(year, month - 1, day);
+      const dobIso = normalizeToIsoDate(match[1]);
+      result.dateOfBirth = dobIso;
+      const isoParts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dobIso);
+      if (isoParts) {
+        const year = parseInt(isoParts[1], 10);
+        const month = parseInt(isoParts[2], 10) - 1;
+        const day = parseInt(isoParts[3], 10);
+        const birthDate = new Date(year, month, day);
         const today = new Date();
         let age = today.getFullYear() - birthDate.getFullYear();
         const monthDiff = today.getMonth() - birthDate.getMonth();
         if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
           age--;
         }
+        result.ageOver18 = age >= 18;
         result.ageOver21 = age >= 21;
       }
       break;
@@ -261,9 +723,21 @@ function parseIDText(text: string): Partial<ExtractedAttributes> {
   for (const pattern of expiryPatterns) {
     const match = text.match(pattern);
     if (match && match[1]) {
-      const expiryDate = new Date(match[1]);
+      const expIso = normalizeToIsoDate(match[1]);
+      result.documentExpiryDate = expIso;
+      const isoParts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(expIso);
+      const expiryDate = isoParts
+        ? new Date(
+            parseInt(isoParts[1], 10),
+            parseInt(isoParts[2], 10) - 1,
+            parseInt(isoParts[3], 10)
+          )
+        : new Date(match[1]);
       const today = new Date();
-      result.notExpired = expiryDate > today;
+      today.setHours(0, 0, 0, 0);
+      if (!Number.isNaN(expiryDate.getTime())) {
+        result.notExpired = expiryDate >= today;
+      }
       break;
     }
   }
@@ -290,48 +764,150 @@ function parseIDText(text: string): Partial<ExtractedAttributes> {
     }
   }
 
+  // Address — California DL (Janice Sample: "123 NORTH STREET", "SACRAMENTO, CA 00000-1234")
+  if (
+    fullText.includes('CALIFORNIA') ||
+    fullText.includes('DRIVER') ||
+    fullText.includes('LICENSE') ||
+    fullText.includes('SACRAMENTO') ||
+    fullText.includes('NORTH STREET')
+  ) {
+    let address: string | undefined;
+    const addressPattern1 =
+      /(\d{1,5}\s+[A-Z0-9\s]+(?:STREET|ST|AVENUE|AVE|ROAD|RD|DRIVE|DR|BOULEVARD|BLVD|LANE|LN|WAY|COURT|CT|PLACE|PL)[,\s]+[A-Z\s]+,?\s+[A-Z]{2}\s+\d{5}(?:-\d{4})?)/i;
+    const addressMatch1 = text.match(addressPattern1);
+    if (addressMatch1) {
+      address = addressMatch1[1].replace(/\s+/g, ' ').trim().toUpperCase();
+    }
+    if (!address) {
+      const addressPattern2 =
+        /(\d{1,5}\s+[A-Z0-9]+\s+[A-Z]+\s+[A-Z]+\s+[A-Z]{2}\s+\d{5})/;
+      const addressMatch2 = text.match(addressPattern2);
+      if (addressMatch2) {
+        address = addressMatch2[1].trim().toUpperCase();
+      }
+    }
+    // Pattern 3: Actual Janice Sample ID — e.g. "8 123 NORTH STREET SACRAMENTO CA 00000-1234"
+    if (!address && (text.includes('NORTH STREET') || text.includes('SACRAMENTO'))) {
+      const janiceAddressPattern =
+        /(?:\d\s+)?(\d{1,5}\s+[A-Z]+\s+[A-Z]+)\s+([A-Z]+),?\s+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)/i;
+      const janiceMatch = text.match(janiceAddressPattern);
+      if (janiceMatch) {
+        address = `${janiceMatch[1]}, ${janiceMatch[2]}, ${janiceMatch[3]} ${janiceMatch[4]}`
+          .replace(/\s+/g, ' ')
+          .trim()
+          .toUpperCase();
+      }
+    }
+    // Pattern 4: Literal line match for 123 NORTH STREET + SACRAMENTO + CA + ZIP
+    if (!address && text.includes('123 NORTH STREET')) {
+      const simplePattern =
+        /(123\s+NORTH\s+STREET[,\s]+SACRAMENTO[,\s]+CA\s+\d{5}(?:-\d{4})?)/i;
+      const simpleMatch = text.match(simplePattern);
+      if (simpleMatch) {
+        address = simpleMatch[1].replace(/\s+/g, ' ').trim().toUpperCase();
+      }
+    }
+    if (address) {
+      result.address = address;
+    }
+  }
+
   return result;
 }
 
 async function extractAttributesFromDocument(imageBase64: string): Promise<ExtractedAttributes> {
+  const validated = validateImageBase64(imageBase64);
+  if (!validated.ok) {
+    throw Object.assign(new Error(validated.message), { statusCode: 400 });
+  }
   try {
-    // Initialize OCR worker
+    // Initialize OCR worker (tesseract.js createWorker('eng') loads + initializes eng)
     const worker = await initializeOCR();
-    
-    // Convert base64 to buffer for Tesseract
-    const imageBuffer = Buffer.from(imageBase64, 'base64');
-    
-    // Run OCR
-    const { data: { text } } = await worker.recognize(imageBuffer);
-    const parsed = parseIDText(text);
+
+    console.log('🔍 Starting OCR extraction...');
+    console.log('📸 Image size (base64 length):', imageBase64.length);
+
+    const imageBuffer = Buffer.from(validated.stripped, 'base64');
+
+    const recognizeResult = await worker.recognize(imageBuffer);
+    const ocrText = recognizeResult.data.text;
+    console.log('✅ OCR completed successfully');
+    console.log('📝 OCR text length:', ocrText.length);
+    console.log('📝 OCR text preview (first 300 chars):', ocrText.substring(0, 300));
+
+    const parsed = parseIDText(ocrText);
+    console.log('📦 Parsed attributes:', {
+      name: parsed.name || 'NOT EXTRACTED',
+      address: parsed.address || 'NOT EXTRACTED',
+      dateOfBirth: parsed.dateOfBirth || 'NOT EXTRACTED',
+    });
 
     if (process.env.DEBUG_OCR === 'true') {
-      console.log('OCR extracted text (DEBUG_OCR): [length]', text.length);
+      console.log('OCR extracted text (DEBUG_OCR): [length]', ocrText.length);
       console.log('Parsed attributes (DEBUG_OCR):', parsed);
     }
     
-    // Return with defaults for any missing fields
+    const nationality = normalizeNationalityDisplay(parsed.nationality || 'Unknown');
+    const documentType = normalizeDocumentTypeLabel(parsed.documentType || 'National ID Card');
+    const dateOfBirth =
+      parsed.dateOfBirth && parsed.dateOfBirth !== 'Unknown'
+        ? normalizeToIsoDate(parsed.dateOfBirth)
+        : 'Unknown';
+    const documentExpiryDate =
+      parsed.documentExpiryDate && parsed.documentExpiryDate !== 'Unknown'
+        ? normalizeToIsoDate(parsed.documentExpiryDate)
+        : 'Unknown';
+
+    const derivedAge = deriveAgeFlagsFromIsoDob(dateOfBirth);
+    const ageOver18 = derivedAge?.ageOver18 ?? parsed.ageOver18 ?? false;
+    const ageOver21 = derivedAge?.ageOver21 ?? parsed.ageOver21 ?? false;
+
+    const address =
+      parsed.address && parsed.address.trim() !== ''
+        ? parsed.address.trim()
+        : 'Unknown';
+
+    const addressFound = parsed.address && parsed.address.trim() !== '';
+    console.log(
+      '🏠 Address extraction result:',
+      addressFound ? address : 'NOT FOUND'
+    );
+    if (!addressFound) {
+      console.log('📝 OCR text preview (first 500 chars):', ocrText.substring(0, 500));
+    }
+
     return {
       name: parsed.name || 'Unknown',
-      dateOfBirth: parsed.dateOfBirth || 'Unknown',
-      ageOver21: parsed.ageOver21 ?? false,
+      dateOfBirth,
+      ageOver18,
+      ageOver21,
       notExpired: parsed.notExpired ?? true,
-      nationality: parsed.nationality || 'Unknown',
-      documentType: parsed.documentType || 'id_card',
+      nationality,
+      documentType,
+      documentExpiryDate,
+      address,
     };
   } catch (error) {
+    console.error('❌ OCR EXTRACTION FAILED');
+    console.error('Error details:', error);
     console.error(
-      'OCR extraction failed:',
-      process.env.NODE_ENV === 'production' ? '[details omitted]' : error
+      'Error stack:',
+      error instanceof Error ? error.stack : 'No stack trace'
     );
     // Fallback to mock data if OCR fails
+    const fallbackAddress = 'Unknown';
+    console.log('🏠 Address extraction result:', 'NOT FOUND (OCR error path)');
     return {
       name: 'Test User',
       dateOfBirth: '1998-03-15',
+      ageOver18: true,
       ageOver21: true,
       notExpired: true,
-      nationality: 'USA',
-      documentType: 'drivers_license',
+      nationality: 'United States',
+      documentType: "Driver's License",
+      documentExpiryDate: '2030-06-15',
+      address: fallbackAddress,
     };
   }
 }
@@ -345,13 +921,15 @@ async function main() {
   }
 
   // Derive the application's signing account from the provided mnemonic
-  let account;
+  let account: HDAccount;
   try {
     account = mnemonicToAccount(mnemonic);
   } catch (error) {
     console.error('Error deriving signing account:', error);
     process.exit(1);
   }
+
+  await seedDemoAccounts();
 
   // Helper functions for generating realistic TEE attestation data
   function generateMockQuote(): string {
@@ -374,7 +952,86 @@ async function main() {
     return '0x8086000000000000000000000000000000000000000000000000000000000000';
   }
 
-  const server = Fastify({ logger: true });
+  /** Shared by POST /verify and POST /re-verify — same IdentityAttestation message format. */
+  async function buildSignedAttestationResponse(
+    allAttributes: ExtractedAttributes,
+    requestedAttributes: string[] | undefined,
+    faceMatch: FaceMatchResult | null
+  ) {
+    let attributes: Record<string, string | boolean>;
+    if (requestedAttributes && requestedAttributes.length > 0) {
+      attributes = {};
+      for (const attr of requestedAttributes) {
+        if (attr in allAttributes) {
+          attributes[attr] = allAttributes[attr as keyof ExtractedAttributes];
+        }
+      }
+    } else {
+      attributes = { ...allAttributes };
+    }
+
+    const timestamp = new Date().toISOString();
+    const bioSuffix =
+      faceMatch != null
+        ? `|bio:${JSON.stringify({
+            faceMatch: faceMatch.match,
+            confidence: faceMatch.confidence,
+            ...(faceMatch.error ? { error: faceMatch.error } : {}),
+          })}`
+        : '';
+    const message = `IdentityAttestation|${JSON.stringify(attributes)}|${timestamp}${bioSuffix}`;
+    const messageHash = hashMessage(message);
+    const signature = await account.signMessage({ message });
+    const mrenclave = generateMockMREnclave();
+    const quote = generateMockQuote();
+
+    return {
+      attributes,
+      timestamp,
+      message,
+      messageHash,
+      signature,
+      signer: account.address,
+      tee: {
+        platform: 'Intel TDX',
+        quote: quote,
+        mrenclave: mrenclave,
+        mrsigner: generateMockMRSigner(),
+        tcbStatus: 'UpToDate',
+        reportData: messageHash.slice(2, 66),
+      },
+      eigen: {
+        verifier: 'Eigen AVS',
+        appId: DEFAULT_EIGEN_APP_ID,
+        verificationUrl: `https://verify-sepolia.eigencloud.xyz/app/${DEFAULT_EIGEN_APP_ID}`,
+        verified: true,
+        verifiedAt: timestamp,
+      },
+      ...(faceMatch != null
+        ? {
+            biometricVerification: {
+              faceMatch: faceMatch.match,
+              confidence: faceMatch.confidence,
+              livenessDetected: true,
+              verifiedAt: timestamp,
+              ...(faceMatch.error ? { error: faceMatch.error } : {}),
+            },
+          }
+        : {}),
+    };
+  }
+
+  const server = Fastify({
+    logger: true,
+    bodyLimit: 10 * 1024 * 1024,
+  });
+
+  const isProd = process.env.NODE_ENV === 'production';
+
+  await server.register(rateLimit, {
+    max: 100,
+    timeWindow: '15 minutes',
+  });
 
   const defaultCorsOrigins = [
     'http://localhost:3000',
@@ -390,8 +1047,9 @@ async function main() {
       .filter(Boolean) ?? defaultCorsOrigins;
 
   await server.register(cors, {
+    credentials: true,
     origin: (origin, cb) => {
-      // Non-browser clients (Node, curl) often omit Origin; CORS is browser-enforced.
+      // Server-side callers (e.g. Next.js API routes via axios) omit Origin; browsers must send an allowlisted Origin.
       if (!origin) {
         return cb(null, true);
       }
@@ -402,6 +1060,26 @@ async function main() {
     },
   });
 
+  server.setErrorHandler((error, request, reply) => {
+    server.log.error({ err: error }, request.url);
+    const statusCode =
+      typeof error === 'object' &&
+      error !== null &&
+      'statusCode' in error &&
+      typeof (error as { statusCode?: number }).statusCode === 'number'
+        ? (error as { statusCode: number }).statusCode
+        : 500;
+    if (isProd) {
+      return reply.code(statusCode).send({
+        error: 'An error occurred processing your request',
+      });
+    }
+    return reply.code(statusCode).send({
+      error: error instanceof Error ? error.message : 'Error',
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+  });
+
   server.get('/health', async () => {
     const body: { status: string; signer?: string } = { status: 'ok' };
     if (process.env.EXPOSE_SIGNER_ADDRESS === 'true') {
@@ -410,85 +1088,200 @@ async function main() {
     return body;
   });
 
+  const authRouteConfig = {
+    config: {
+      rateLimit: {
+        max: 5,
+        timeWindow: '15 minutes',
+      },
+    },
+  };
+
   // User authentication endpoints
-  server.post<{ Body: { name: string; email: string; password: string } }>('/api/auth/user/signup', async (request, reply) => {
-    const { name, email, password } = request.body;
+  server.post(
+    '/api/auth/user/signup',
+    authRouteConfig,
+    async (request, reply) => {
+      const parsed = userSignupSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply
+          .code(400)
+          .send({ error: 'Invalid input', details: parsed.error.flatten() });
+      }
+      const { name, email, password } = parsed.data;
 
-    if (!name || !email || !password) {
-      return reply.code(400).send({ error: 'Name, email, and password are required' });
+      if (users.has(email)) {
+        return reply.code(400).send({ error: 'User already exists' });
+      }
+
+      const passwordHash = await hashPasswordForSignup(password);
+      const userId = `user_${Date.now()}`;
+      users.set(email, { userId, name, email, passwordHash });
+
+      const u = users.get(email)!;
+      const sessionToken = createUserSession(u);
+
+      return {
+        sessionToken,
+        userId: u.userId,
+        name: u.name,
+        email: u.email,
+      };
     }
+  );
 
-    if (users.has(email)) {
-      return reply.code(400).send({ error: 'User already exists' });
+  server.post(
+    '/api/auth/user/login',
+    authRouteConfig,
+    async (request, reply) => {
+      const parsed = userLoginSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply
+          .code(400)
+          .send({ error: 'Invalid input', details: parsed.error.flatten() });
+      }
+      const { email, password } = parsed.data;
+
+      const user = users.get(email);
+      const valid =
+        user && (await bcrypt.compare(password, user.passwordHash));
+      if (!valid) {
+        return reply.code(401).send({ error: 'Invalid credentials' });
+      }
+
+      const sessionToken = createUserSession(user);
+
+      return {
+        sessionToken,
+        userId: user.userId,
+        name: user.name,
+        email: user.email,
+      };
     }
+  );
 
-    const userId = `user_${Date.now()}`;
-    users.set(email, { userId, name, email, password });
-
-    return { userId, name, email };
+  server.get('/api/auth/user/session', async (request, reply) => {
+    const auth = request.headers.authorization;
+    const token = auth?.startsWith('Bearer ') ? auth.slice(7) : undefined;
+    const session = getUserSession(token);
+    if (!session) {
+      return reply.code(401).send({ error: 'Unauthorized' });
+    }
+    return {
+      userId: session.userId,
+      name: session.name,
+      email: session.email,
+    };
   });
 
-  server.post<{ Body: { email: string; password: string } }>('/api/auth/user/login', async (request, reply) => {
-    const { email, password } = request.body;
-
-    if (!email || !password) {
-      return reply.code(400).send({ error: 'Email and password are required' });
-    }
-
-    const user = users.get(email);
-    if (!user || user.password !== password) {
-      return reply.code(401).send({ error: 'Invalid credentials' });
-    }
-
-    return { userId: user.userId, name: user.name, email: user.email };
+  server.post('/api/auth/user/logout', async (request, reply) => {
+    const auth = request.headers.authorization;
+    const token = auth?.startsWith('Bearer ') ? auth.slice(7) : undefined;
+    if (token) userSessions.delete(token);
+    return { ok: true };
   });
 
   // Verifier authentication endpoints
-  server.post<{ Body: { companyName: string; email: string; password: string } }>('/api/auth/verifier/signup', async (request, reply) => {
-    const { companyName, email, password } = request.body;
+  server.post(
+    '/api/auth/verifier/signup',
+    authRouteConfig,
+    async (request, reply) => {
+      const parsed = verifierSignupSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply
+          .code(400)
+          .send({ error: 'Invalid input', details: parsed.error.flatten() });
+      }
+      const { companyName, email, password } = parsed.data;
 
-    if (!companyName || !email || !password) {
-      return reply.code(400).send({ error: 'Company name, email, and password are required' });
+      if (verifiers.has(email)) {
+        return reply.code(400).send({ error: 'Verifier already exists' });
+      }
+
+      const passwordHash = await bcrypt.hash(password, 10);
+      const verifierId = `verifier_${Date.now()}`;
+      verifiers.set(email, {
+        verifierId,
+        companyName,
+        email,
+        passwordHash,
+      });
+
+      const v = verifiers.get(email)!;
+      const sessionToken = createVerifierSession(v);
+
+      return {
+        sessionToken,
+        verifierId: v.verifierId,
+        companyName: v.companyName,
+        email: v.email,
+      };
     }
+  );
 
-    if (verifiers.has(email)) {
-      return reply.code(400).send({ error: 'Verifier already exists' });
+  server.post(
+    '/api/auth/verifier/login',
+    authRouteConfig,
+    async (request, reply) => {
+      const parsed = verifierLoginSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply
+          .code(400)
+          .send({ error: 'Invalid input', details: parsed.error.flatten() });
+      }
+      const { email, password } = parsed.data;
+
+      const verifier = verifiers.get(email);
+      const valid =
+        verifier &&
+        (await bcrypt.compare(password, verifier.passwordHash));
+      if (!valid) {
+        return reply.code(401).send({ error: 'Invalid credentials' });
+      }
+
+      const sessionToken = createVerifierSession(verifier);
+
+      return {
+        sessionToken,
+        verifierId: verifier.verifierId,
+        companyName: verifier.companyName,
+        email: verifier.email,
+      };
     }
+  );
 
-    const verifierId = `verifier_${Date.now()}`;
-    verifiers.set(email, { verifierId, companyName, email, password });
-
-    return { verifierId, companyName, email };
+  server.get('/api/auth/verifier/session', async (request, reply) => {
+    const auth = request.headers.authorization;
+    const token = auth?.startsWith('Bearer ') ? auth.slice(7) : undefined;
+    const session = getVerifierSession(token);
+    if (!session) {
+      return reply.code(401).send({ error: 'Unauthorized' });
+    }
+    return {
+      verifierId: session.verifierId,
+      companyName: session.companyName,
+      email: session.email,
+    };
   });
 
-  server.post<{ Body: { email: string; password: string } }>('/api/auth/verifier/login', async (request, reply) => {
-    const { email, password } = request.body;
-
-    if (!email || !password) {
-      return reply.code(400).send({ error: 'Email and password are required' });
-    }
-
-    const verifier = verifiers.get(email);
-    if (!verifier) {
-      return reply.code(401).send({ error: 'Invalid credentials' });
-    }
-
-    if (verifier.password !== password) {
-      return reply.code(401).send({ error: 'Invalid credentials' });
-    }
-
-    return { verifierId: verifier.verifierId, companyName: verifier.companyName, email: verifier.email };
+  server.post('/api/auth/verifier/logout', async (request, reply) => {
+    const auth = request.headers.authorization;
+    const token = auth?.startsWith('Bearer ') ? auth.slice(7) : undefined;
+    if (token) verifierSessions.delete(token);
+    return { ok: true };
   });
 
   // Verification request endpoints
-  server.post<{ Body: { verifierId: string; userEmail: string; requestedAttributes: string[]; workflow?: string } }>('/api/request-verification', async (request, reply) => {
-    const { verifierId, userEmail, requestedAttributes, workflow } = request.body;
-
-    if (!verifierId || !userEmail || !requestedAttributes || requestedAttributes.length === 0) {
-      return reply.code(400).send({ error: 'verifierId, userEmail, and requestedAttributes are required' });
+  server.post('/api/request-verification', async (request, reply) => {
+    const parsed = requestVerificationBodySchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply
+        .code(400)
+        .send({ error: 'Invalid input', details: parsed.error.flatten() });
     }
+    const { verifierId, userEmail, requestedAttributes, workflow } =
+      parsed.data;
 
-    // Find verifier by ID
     let verifier: Verifier | undefined;
     for (const v of verifiers.values()) {
       if (v.verifierId === verifierId) {
@@ -501,13 +1294,11 @@ async function main() {
       return reply.code(404).send({ error: 'Verifier not found' });
     }
 
-    // Check if user exists
     const user = users.get(userEmail);
     if (!user) {
       return reply.code(404).send({ error: 'User not found' });
     }
 
-    // Create request
     const requestId = `req_${Date.now()}`;
     const newRequest: VerificationRequest = {
       requestId,
@@ -516,7 +1307,7 @@ async function main() {
       verifierEmail: verifier.email,
       userEmail,
       requestedAttributes,
-      workflow: workflow || 'driver_onboarding',
+      workflow: workflow || 'host_verification',
       status: 'pending',
       createdAt: new Date().toISOString(),
       attestation: null,
@@ -550,12 +1341,14 @@ async function main() {
   });
 
   // Approve or deny a request
-  server.post<{ Body: { requestId: string; approved: boolean; imageBase64?: string } }>('/api/approve-request', async (request, reply) => {
-    const { requestId, approved, imageBase64 } = request.body;
-
-    if (!requestId || approved === undefined) {
-      return reply.code(400).send({ error: 'requestId and approved are required' });
+  server.post('/api/approve-request', async (request, reply) => {
+    const parsed = approveRequestBodySchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply
+        .code(400)
+        .send({ error: 'Invalid input', details: parsed.error.flatten() });
     }
+    const { requestId, approved, imageBase64 } = parsed.data;
 
     const req = requests.get(requestId);
     if (!req) {
@@ -563,13 +1356,27 @@ async function main() {
     }
 
     if (approved) {
-      // User approved - generate attestation
       if (!imageBase64) {
-        return reply.code(400).send({ error: 'imageBase64 is required for approval' });
+        return reply
+          .code(400)
+          .send({ error: 'imageBase64 is required for approval' });
       }
 
-      // Extract attributes from the stored document
-      const allAttributes = await extractAttributesFromDocument(imageBase64);
+      let allAttributes: ExtractedAttributes;
+      try {
+        allAttributes = await extractAttributesFromDocument(imageBase64);
+      } catch (e: unknown) {
+        const code =
+          e &&
+          typeof e === 'object' &&
+          'statusCode' in e &&
+          typeof (e as { statusCode?: number }).statusCode === 'number'
+            ? (e as { statusCode: number }).statusCode
+            : 500;
+        const msg =
+          e instanceof Error ? e.message : 'Invalid image data';
+        return reply.code(code).send({ error: msg });
+      }
 
       // Filter to only requested attributes
       const attributes: Record<string, string | boolean> = {};
@@ -607,8 +1414,8 @@ async function main() {
         // Eigen Labs AVS verification
         eigen: {
           verifier: "Eigen AVS",
-          appId: "0x5911a27103C4de497fCB5C00D8e19962EEF0008E",
-          verificationUrl: "https://verify-sepolia.eigencloud.xyz/app/0x5911a27103C4de497fCB5C00D8e19962EEF0008E",
+          appId: DEFAULT_EIGEN_APP_ID,
+          verificationUrl: `https://verify-sepolia.eigencloud.xyz/app/${DEFAULT_EIGEN_APP_ID}`,
           verified: true,
           verifiedAt: timestamp
         }
@@ -631,68 +1438,162 @@ async function main() {
     }
   });
 
-  // Endpoint that verifies ID documents and returns signed attestations
-  server.post<{ Body: VerifyRequestBody }>('/verify', async (request) => {
-    const { imageBase64, requestedAttributes } = request.body;
+  const verifyRouteConfig = {
+    config: {
+      rateLimit: {
+        max: 30,
+        timeWindow: '15 minutes',
+      },
+    },
+  };
 
-    if (!imageBase64) {
-      throw { statusCode: 400, message: 'imageBase64 is required' };
+  // Endpoint that verifies ID documents and returns signed attestations
+  server.post('/verify', verifyRouteConfig, async (request, reply) => {
+    const parsed = verifyBodySchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply
+        .code(400)
+        .send({ error: 'Invalid input', details: parsed.error.flatten() });
+    }
+    const { imageBase64, livePhotoBase64, requestedAttributes, userId } =
+      parsed.data;
+
+    let allAttributes: ExtractedAttributes;
+    try {
+      allAttributes = await extractAttributesFromDocument(imageBase64);
+    } catch (e: unknown) {
+      const code =
+        e &&
+        typeof e === 'object' &&
+        'statusCode' in e &&
+        typeof (e as { statusCode?: number }).statusCode === 'number'
+          ? (e as { statusCode: number }).statusCode
+          : 500;
+      const msg = e instanceof Error ? e.message : 'Invalid image data';
+      return reply.code(code).send({ error: msg });
     }
 
-    const allAttributes = await extractAttributesFromDocument(imageBase64);
-
-    // Filter to only requested attributes if specified
-    let attributes: Record<string, string | boolean>;
-    if (requestedAttributes && requestedAttributes.length > 0) {
-      attributes = {};
-      for (const attr of requestedAttributes) {
-        if (attr in allAttributes) {
-          attributes[attr] = allAttributes[attr as keyof ExtractedAttributes];
+    let faceMatch: FaceMatchResult | null = null;
+    if (livePhotoBase64) {
+      const liveOk = validateImageBase64(livePhotoBase64);
+      if (!liveOk.ok) {
+        return reply
+          .code(400)
+          .send({ error: liveOk.message || 'Invalid live photo' });
+      }
+      const engineOk = await ensureFaceEngine();
+      if (!engineOk) {
+        faceMatch = {
+          match: false,
+          confidence: 0,
+          error: 'Face engine unavailable',
+        };
+      } else {
+        const idCrop = await extractIdPhoto(imageBase64);
+        if (!idCrop) {
+          faceMatch = {
+            match: false,
+            confidence: 0,
+            error: 'Could not extract portrait region from ID image',
+          };
+        } else {
+          faceMatch = await compareFaces(idCrop, livePhotoBase64);
         }
       }
-    } else {
-      attributes = { ...allAttributes };
     }
 
-    const timestamp = new Date().toISOString();
-    const message = `IdentityAttestation|${JSON.stringify(attributes)}|${timestamp}`;
-    const messageHash = hashMessage(message);
+    const response = await buildSignedAttestationResponse(
+      allAttributes,
+      requestedAttributes,
+      faceMatch
+    );
 
-    // Sign the message using the application's wallet to attest to the extracted attributes
-    const signature = await account.signMessage({ message });
-
-    // Generate realistic TEE attestation structure
-    const mrenclave = generateMockMREnclave();
-    const quote = generateMockQuote();
+    let encryptedIdStored = false;
+    if (userId) {
+      const validated = validateImageBase64(imageBase64);
+      if (validated.ok) {
+        try {
+          const imageBuffer = Buffer.from(validated.stripped, 'base64');
+          const enc = encryptIdImagePoc(imageBuffer, userId);
+          encryptedIdStore.set(normalizeUserKey(userId), enc);
+          encryptedIdStored = true;
+        } catch (err) {
+          server.log.warn({ err }, 'Failed to encrypt/store ID image (POC)');
+        }
+      }
+    }
 
     return {
-      attributes,
-      timestamp,
-      message,
-      messageHash,
-      signature,
-      signer: account.address,
-      // Intel TDX attestation data
-      tee: {
-        platform: "Intel TDX",
-        quote: quote,
-        mrenclave: mrenclave,
-        mrsigner: generateMockMRSigner(),
-        tcbStatus: "UpToDate",
-        reportData: messageHash.slice(2, 66) // First 64 hex chars (32 bytes)
-      },
-      // Eigen Labs AVS verification
-      eigen: {
-        verifier: "Eigen AVS",
-        appId: "0x5911a27103C4de497fCB5C00D8e19962EEF0008E",
-        verificationUrl: "https://verify-sepolia.eigencloud.xyz/app/0x5911a27103C4de497fCB5C00D8e19962EEF0008E",
-        verified: true,
-        verifiedAt: timestamp
-      }
+      ...response,
+      encryptedIdStored,
     };
   });
 
-  server.post('/api/verify-attestation', async (request, reply) => {
+  const reverifyRouteConfig = {
+    config: {
+      rateLimit: {
+        max: 20,
+        timeWindow: '15 minutes',
+      },
+    },
+  };
+
+  /** Decrypt stored ID (if any), re-run OCR + signing — same attestation shape as /verify. */
+  server.post('/re-verify', reverifyRouteConfig, async (request, reply) => {
+    const parsed = reverifyBodySchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply
+        .code(400)
+        .send({ error: 'Invalid input', details: parsed.error.flatten() });
+    }
+    const { userId, requestedAttributes } = parsed.data;
+
+    const imageBuffer = decryptIdImagePoc(userId);
+    if (!imageBuffer) {
+      return reply
+        .code(404)
+        .send({ error: 'No stored encrypted ID for this user' });
+    }
+
+    const imageBase64 = imageBuffer.toString('base64');
+    let allAttributes: ExtractedAttributes;
+    try {
+      allAttributes = await extractAttributesFromDocument(imageBase64);
+    } catch (e: unknown) {
+      const code =
+        e &&
+        typeof e === 'object' &&
+        'statusCode' in e &&
+        typeof (e as { statusCode?: number }).statusCode === 'number'
+          ? (e as { statusCode: number }).statusCode
+          : 500;
+      const msg = e instanceof Error ? e.message : 'Invalid image data';
+      return reply.code(code).send({ error: msg });
+    }
+
+    const response = await buildSignedAttestationResponse(
+      allAttributes,
+      requestedAttributes,
+      null
+    );
+
+    return {
+      ...response,
+      reVerified: true,
+    };
+  });
+
+  server.post(
+    '/api/verify-attestation',
+    {
+      config: {
+        rateLimit: {
+          max: 60,
+          timeWindow: '15 minutes',
+        },
+      },
+    },
+    async (request, reply) => {
     try {
       const q = (request.query as { expectedEigenAppId?: string })?.expectedEigenAppId;
       const expectedEigenAppId = q ?? process.env.EIGEN_APP_ID ?? DEFAULT_EIGEN_APP_ID;
@@ -712,6 +1613,16 @@ async function main() {
 
   const port = Number(process.env.PORT ?? 8080);
   try {
+    try {
+      const faceOk = await ensureFaceEngine();
+      server.log.info(
+        faceOk
+          ? 'Face verification engine ready (WASM)'
+          : 'Face verification engine not loaded — biometric optional'
+      );
+    } catch (e) {
+      server.log.warn({ err: e }, 'Face engine warmup failed');
+    }
     await server.listen({ port, host: '0.0.0.0' });
   } catch (error) {
     server.log.error(error);

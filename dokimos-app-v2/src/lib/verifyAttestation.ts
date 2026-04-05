@@ -1,8 +1,7 @@
 import { verifyMessage } from "viem";
+import { DEFAULT_EIGEN_APP_ID } from "./eigenConstants";
 
-/** Default EigenCompute app id used in demo attestations (verify dashboard on Sepolia). */
-export const DEFAULT_EIGEN_APP_ID =
-  "0x5911a27103C4de497fCB5C00D8e19962EEF0008E";
+export { DEFAULT_EIGEN_APP_ID };
 
 export type DokimosAttestationInput = {
   message: string;

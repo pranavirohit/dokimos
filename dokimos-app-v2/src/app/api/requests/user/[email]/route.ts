@@ -16,7 +16,7 @@ export async function GET(
       );
     }
 
-    const TEE_ENDPOINT = process.env.TEE_ENDPOINT || "http://localhost:8082";
+    const TEE_ENDPOINT = process.env.TEE_ENDPOINT || "http://localhost:8080";
 
     const response = await axios.get(
       `${TEE_ENDPOINT}/api/requests/user/${encodeURIComponent(email)}`,

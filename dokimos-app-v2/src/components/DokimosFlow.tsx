@@ -1,164 +1,146 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect, useRef } from "react";
-import { Shield, Activity, Settings, Signal, Wifi, Battery, ArrowLeft, Upload, Check, ExternalLink, Copy, LogOut, XCircle } from "lucide-react";
+import { motion } from "framer-motion";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  type ChangeEvent,
+} from "react";
+import {
+  Shield,
+  ArrowLeft,
+  ImagePlus,
+  Check,
+  ExternalLink,
+  Copy,
+  XCircle,
+  Activity,
+  Settings,
+  ChevronDown,
+  Clock,
+} from "lucide-react";
 import axios from "axios";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useSession, signIn, signOut } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
+import { VaultInfoMenu } from "@/components/dokimos/VaultInfoMenu";
+import { getEigenVerificationDashboardUrl } from "@/lib/eigenUrls";
+import { workflowDisplayName } from "@/lib/workflowDisplayName";
+import { useDokimosApp } from "@/contexts/DokimosAppContext";
+import {
+  STORAGE_HAS_ENCRYPTED_ID,
+  STORAGE_LIVE_PHOTO,
+  type AttestationData,
+  type VerificationRequest,
+  type DokimosAppTab,
+} from "@/types/dokimos";
 
-interface AttestationData {
-  attributes: Record<string, string | boolean>;
-  timestamp: string;
-  message: string;
-  messageHash: string;
-  signature: string;
-  signer: string;
-}
-
-interface VerificationRequest {
-  requestId: string;
-  verifierId: string;
-  verifierName: string;
-  verifierEmail: string;
-  userEmail: string;
-  requestedAttributes: string[];
-  workflow?: string;
-  status: 'pending' | 'approved' | 'denied';
-  createdAt: string;
-  completedAt?: string;
-  attestation: any | null;
-}
-
-export default function DokimosFlow() {
-  const router = useRouter();
-  const { data: session, status } = useSession();
-  const [currentScreen, setCurrentScreen] = useState(0);
-  const [attestationData, setAttestationData] = useState<AttestationData | null>(null);
-  const [storedImageData, setStoredImageData] = useState<string | null>(null);
-  const [selectedRequest, setSelectedRequest] = useState<VerificationRequest | null>(null);
-
-  // Check if user is logged in and skip to upload screen
-  useEffect(() => {
-    if (status === "authenticated" && currentScreen < 3) {
-      // User is logged in, skip intro and go to upload screen
-      setCurrentScreen(3);
-    }
-  }, [status]);
-
-  // Auto-advance through intro animation
-  const advanceScreen = () => {
-    if (currentScreen < 8) {
-      setCurrentScreen(currentScreen + 1);
-    }
-  };
-
-  const goBack = () => {
-    if (currentScreen > 0) {
-      setCurrentScreen(currentScreen - 1);
-    }
-  };
-
-  const handleSignOut = async () => {
-    await signOut({ redirect: false });
-    setCurrentScreen(0); // Reset to intro
-  };
-
-  // Auto-advance animation screens
-  useEffect(() => {
-    if (currentScreen === 0 || currentScreen === 1) {
-      const timer = setTimeout(() => {
-        advanceScreen();
-      }, 3500);
-      return () => clearTimeout(timer);
-    }
-  }, [currentScreen]);
-
-  const renderScreen = () => {
-    switch (currentScreen) {
-      case 0:
-        return <Screen01A key="01a" />;
-      case 1:
-        return <Screen01B key="01b" />;
-      case 2:
-        return <Screen01C key="01c" onNext={advanceScreen} />;
-      case 3:
-        return <Screen02Upload key="02" onNext={advanceScreen} onBack={goBack} setAttestationData={setAttestationData} setStoredImageData={setStoredImageData} />;
-      case 4:
-        return <Screen02BLiveness key="02b" onNext={advanceScreen} onBack={goBack} />;
-      case 5:
-        return <Screen03Vault key="03" onNext={advanceScreen} onBack={goBack} attestationData={attestationData} />;
-      case 6:
-        return <Screen04Share key="04" onNext={advanceScreen} onBack={goBack} selectedRequest={selectedRequest} storedImageData={storedImageData} setAttestationData={setAttestationData} />;
-      case 7:
-        return <Screen05Receipt key="05" onNext={advanceScreen} onBack={goBack} attestationData={attestationData} selectedRequest={selectedRequest} />;
-      case 8:
-        return <Screen06History key="06" onBack={goBack} setCurrentScreen={setCurrentScreen} setSelectedRequest={setSelectedRequest} />;
-      default:
-        return null;
-    }
-  };
-
+/** Shared shell: full-viewport canvas, optional sub-header, scrollable main, bottom tabs */
+function DokimosAppShell({
+  children,
+  activeTab,
+  onTabChange,
+  showTabBar = true,
+  topBar,
+}: {
+  children: React.ReactNode;
+  activeTab: DokimosAppTab;
+  onTabChange: (tab: DokimosAppTab) => void;
+  showTabBar?: boolean;
+  topBar?: React.ReactNode;
+}) {
   return (
-    <>
-      {/* Mobile view - full screen on actual devices */}
-      <div className="md:hidden relative w-full h-screen bg-white overflow-hidden">
-        <AnimatePresence mode="wait">
-          {renderScreen()}
-        </AnimatePresence>
+    <div className="relative mx-auto flex min-h-[100dvh] w-full max-w-lg flex-col bg-[#FAFAF9] pt-[env(safe-area-inset-top)] shadow-none md:max-h-[min(100dvh,900px)] md:min-h-[min(100dvh,900px)] md:my-4 md:overflow-hidden md:rounded-[32px] md:border md:border-gray-200/80 md:shadow-2xl">
+      {topBar}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">{children}</div>
+        {showTabBar && (
+          <nav
+            className="shrink-0 border-t border-gray-200/90 bg-white/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)] pt-1.5"
+          >
+            <div className="flex items-end justify-around px-2">
+              <button
+                type="button"
+                onClick={() => onTabChange("vault")}
+                className={`flex min-w-[72px] flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors ${
+                  activeTab === "vault"
+                    ? "text-[#4F46E5]"
+                    : "text-[#6B7280] hover:text-gray-900"
+                }`}
+                style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+              >
+                <span
+                  className={`mb-0.5 block h-1 w-1 rounded-full ${activeTab === "vault" ? "bg-[#4F46E5]" : "bg-transparent"}`}
+                  aria-hidden
+                />
+                <Shield size={20} strokeWidth={activeTab === "vault" ? 2.5 : 2} />
+                <span className="text-[11px] font-normal">Vault</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onTabChange("activity")}
+                className={`flex min-w-[72px] flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors ${
+                  activeTab === "activity"
+                    ? "text-[#4F46E5]"
+                    : "text-[#6B7280] hover:text-gray-900"
+                }`}
+                style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+              >
+                <span
+                  className={`mb-0.5 block h-1 w-1 rounded-full ${activeTab === "activity" ? "bg-[#4F46E5]" : "bg-transparent"}`}
+                  aria-hidden
+                />
+                <Activity size={20} strokeWidth={activeTab === "activity" ? 2.5 : 2} />
+                <span className="text-[11px] font-normal">Activity</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onTabChange("settings")}
+                className={`flex min-w-[72px] flex-col items-center gap-1 rounded-lg px-3 py-1 transition-colors ${
+                  activeTab === "settings"
+                    ? "text-[#4F46E5]"
+                    : "text-[#6B7280] hover:text-gray-900"
+                }`}
+                style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+              >
+                <span
+                  className={`mb-0.5 block h-1 w-1 rounded-full ${activeTab === "settings" ? "bg-[#4F46E5]" : "bg-transparent"}`}
+                  aria-hidden
+                />
+                <Settings size={20} strokeWidth={activeTab === "settings" ? 2.5 : 2} />
+                <span className="text-[11px] font-normal">Settings</span>
+              </button>
+            </div>
+          </nav>
+        )}
       </div>
-
-      {/* Desktop view - mockup with controls */}
-      <div className="hidden md:flex items-center justify-center min-h-screen bg-gray-100 p-8">
-        <div className="relative w-[390px] h-[844px] bg-white rounded-[40px] shadow-2xl overflow-auto">
-          <AnimatePresence mode="wait">
-            {renderScreen()}
-          </AnimatePresence>
-        </div>
-
-        {/* Navigation controls for testing */}
-        <div className="ml-8 flex flex-col gap-2">
-          <button
-            onClick={goBack}
-            disabled={currentScreen === 0}
-            className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
-          >
-            ← Back
-          </button>
-          <button
-            onClick={advanceScreen}
-            disabled={currentScreen === 8}
-            className="px-4 py-2 bg-indigo-500 text-white rounded disabled:opacity-50"
-          >
-            Next →
-          </button>
-          <div className="text-sm text-gray-600 mt-4">
-            Screen {currentScreen + 1} of 9
-          </div>
-          <button
-            onClick={handleSignOut}
-            className="mt-6 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
-          >
-            <LogOut size={16} />
-            Sign Out
-          </button>
-        </div>
-      </div>
-    </>
+    </div>
   );
 }
 
-// Shared components
-const StatusBar = () => (
-  <div className="flex items-center justify-between px-6 h-[62px]">
-    <span className="text-[15px] font-semibold text-gray-900">9:41</span>
-    <div className="flex items-center gap-1">
-      <Signal size={16} className="text-gray-900" />
-      <Wifi size={16} className="text-gray-900" />
-      <Battery size={20} className="text-gray-900" />
+export function ShareRequestTopBar({ onBack }: { onBack: () => void }) {
+  return (
+    <div className="sticky top-0 z-10 flex shrink-0 items-center gap-3 border-b border-gray-200/80 bg-[#FAFAF9]/95 px-4 py-3 backdrop-blur-md">
+      <button
+        type="button"
+        onClick={onBack}
+        className="-ml-1 rounded-lg p-1 hover:bg-gray-200/60 transition-colors"
+        aria-label="Back"
+      >
+        <ArrowLeft size={22} className="text-gray-900" />
+      </button>
+      <span
+        className="text-[17px] font-semibold text-gray-900"
+        style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+      >
+        Review request
+      </span>
     </div>
-  </div>
-);
+  );
+}
 
 const ScrollingPills = ({ dark = false }: { dark?: boolean }) => {
   const pills = [
@@ -170,47 +152,39 @@ const ScrollingPills = ({ dark = false }: { dark?: boolean }) => {
     "gig company",
   ];
 
+  const row = [...pills, ...pills, ...pills];
+
   return (
-    <div className="overflow-hidden w-full px-6">
-      <motion.div
-        className="flex gap-2"
-        initial={{ x: 0 }}
-        animate={{ x: -200 }}
-        transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-      >
-        {[...pills, ...pills, ...pills].map((pill, idx) => (
+    <div className="w-full overflow-hidden px-6">
+      <div className="dokimos-pills-track flex gap-2">
+        {row.map((pill, idx) => (
           <div
             key={idx}
-            className={`px-4 h-8 rounded-full flex items-center justify-center whitespace-nowrap text-[13px] font-medium flex-shrink-0 ${
+            className={`flex h-8 flex-shrink-0 items-center justify-center rounded-full px-4 text-[13px] font-medium whitespace-nowrap ${
               dark
-                ? "bg-white/10 border border-white/20 text-white/90"
-                : "bg-gray-100 border border-gray-200 text-gray-600"
+                ? "border border-white/20 bg-white/10 text-white/90"
+                : "border border-gray-200 bg-gray-100 text-gray-600"
             }`}
           >
             {pill}
           </div>
         ))}
-      </motion.div>
+      </div>
     </div>
   );
 };
 
 // Screen 01A - Problem State
-function Screen01A() {
+// Note: Do not put opacity:0 on the full-screen wrapper — if Framer Motion never completes
+// (hydration / edge cases), the whole layer stays invisible and only the gray page bg shows.
+export function Screen01A() {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.8 }}
-      className="absolute inset-0 bg-[#0F1B4C]"
-    >
+    <div className="relative min-h-[100dvh] w-full bg-[#0F1B4C]">
       <motion.h1
-        initial={{ opacity: 0 }}
+        initial={{ opacity: 1 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.8, duration: 1.8 }}
         className="absolute top-[300px] left-6 right-6 text-[64px] font-bold text-white text-center leading-[1.1]"
-        style={{ fontFamily: "Instrument Serif, serif" }}
+        style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}
       >
         Again?
       </motion.h1>
@@ -218,26 +192,19 @@ function Screen01A() {
       <div className="absolute top-[415.5px] left-0 w-full">
         <ScrollingPills dark />
       </div>
-    </motion.div>
+    </div>
   );
 }
 
 // Screen 01B - Transition State
-function Screen01B() {
+export function Screen01B() {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.8 }}
-      className="absolute inset-0 bg-white"
-    >
+    <div className="relative min-h-[100dvh] w-full bg-white">
       <motion.h1
-        initial={{ opacity: 0 }}
+        initial={{ opacity: 1 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.8, duration: 1.8 }}
         className="absolute top-[300px] left-6 right-6 text-[64px] font-bold text-gray-900 text-center leading-[1.1]"
-        style={{ fontFamily: "Instrument Serif, serif" }}
+        style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}
       >
         Meet Dokimos.
       </motion.h1>
@@ -245,29 +212,23 @@ function Screen01B() {
       <div className="absolute top-[415.5px] left-0 w-full">
         <ScrollingPills />
       </div>
-    </motion.div>
+    </div>
   );
 }
 
 // Screen 01C - Final CTA
-function Screen01C({ onNext }: { onNext: () => void }) {
+export function Screen01C({ onNext }: { onNext: () => void }) {
   const handleGoogleSignIn = async () => {
-    await signIn("google", { callbackUrl: "/" });
+    await signIn("google", { callbackUrl: "/onboarding" });
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="absolute inset-0 bg-white"
-    >
+    <div className="relative min-h-[100dvh] w-full bg-white">
       <motion.h2
-        initial={{ opacity: 0 }}
+        initial={{ opacity: 1 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.8, duration: 1.8 }}
         className="absolute top-[260px] left-6 right-6 text-[40px] font-bold text-gray-900 text-center leading-[1.15]"
-        style={{ fontFamily: "Instrument Serif, serif" }}
+        style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}
       >
         The last time you'll ever<br />need to upload your ID.
       </motion.h2>
@@ -277,9 +238,9 @@ function Screen01C({ onNext }: { onNext: () => void }) {
       </div>
 
       <motion.div
-        initial={{ y: 100, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.6 }}
+        initial={{ y: 24 }}
+        animate={{ y: 0 }}
+        transition={{ delay: 0.35, duration: 0.45 }}
         className="absolute bottom-0 left-0 right-0 bg-[#0F1B4C] rounded-t-[24px] px-6 py-10 flex flex-col gap-4"
       >
         <h3 className="text-[22px] font-bold text-white text-center mb-2">
@@ -301,27 +262,27 @@ function Screen01C({ onNext }: { onNext: () => void }) {
           By continuing, you agree to our Terms of Service and Privacy Policy
         </p>
       </motion.div>
-    </motion.div>
+    </div>
   );
 }
 
 // Screen 02 - Upload Flow with REAL backend integration
-function Screen02Upload({ 
-  onNext, 
-  onBack, 
-  setAttestationData,
-  setStoredImageData
-}: { 
-  onNext: () => void; 
+export function Screen02Upload({
+  onNext,
+  onBack,
+  setStoredImageData,
+}: {
+  onNext: () => void;
   onBack: () => void;
-  setAttestationData: (data: AttestationData) => void;
   setStoredImageData: (data: string) => void;
 }) {
-  const [uploadState, setUploadState] = useState<"default" | "drag" | "selected" | "scanning">("default");
+  const [uploadState, setUploadState] = useState<"default" | "drag" | "selected">("default");
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Single file input — on mobile, OS offers camera vs library; desktop opens file picker. */
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
   const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
@@ -344,58 +305,33 @@ function Screen02Upload({
     setUploadState("selected");
   };
 
-  const handleFileSelect = () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/jpeg,image/jpg,image/png,image/webp";
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) handleFileInput(file);
-    };
-    input.click();
+  /** Mobile: camera uses `capture` → OS camera UI + permission; library input has no capture → Photos picker. */
+  const onFileInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleFileInput(file);
+    e.target.value = "";
   };
 
-  const handleVerify = async () => {
+  const handleContinue = async () => {
     if (!selectedFile) return;
-
-    setUploadState("scanning");
     setError(null);
-
     try {
-      // Convert file to base64
       const reader = new FileReader();
       reader.readAsDataURL(selectedFile);
-      
       await new Promise<void>((resolve, reject) => {
         reader.onload = () => resolve();
         reader.onerror = () => reject(new Error("Failed to read file"));
       });
-
       const imageBase64 = (reader.result as string).split(",")[1];
-
-      // Store the image data for later use (when approving requests)
       setStoredImageData(imageBase64);
-      
-      // Also store in localStorage for persistence
-      localStorage.setItem("dokimos_stored_image", imageBase64);
-
-      // Call backend API route (which proxies to TEE)
-      const response = await axios.post("/api/verify", {
-        imageBase64,
-        requestedAttributes: [],
-      });
-
-      // Store attestation data
-      setAttestationData(response.data);
-      
-      // Wait a bit for the scanning animation, then advance
-      setTimeout(() => {
-        onNext();
-      }, 2000);
-    } catch (err) {
-      console.error("Verification failed");
-      setError("Verification failed. Please try again.");
-      setUploadState("selected");
+      try {
+        localStorage.setItem("dokimos_stored_image", imageBase64);
+      } catch {
+        /* ignore */
+      }
+      onNext();
+    } catch {
+      setError("Could not read image. Please try again.");
     }
   };
 
@@ -416,31 +352,23 @@ function Screen02Upload({
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.4 }}
-      className="absolute inset-0 bg-[#FAFAF9] flex flex-col"
-    >
-      <StatusBar />
-      
+    <div className="relative flex min-h-[100dvh] w-full flex-col bg-[#FAFAF9] pt-[env(safe-area-inset-top)]">
       {/* Top Navigation */}
-      <div className="px-6 h-[52px] flex items-center">
+      <div className="flex h-[52px] shrink-0 items-center px-6">
         <button onClick={onBack}>
           <ArrowLeft size={24} className="text-gray-900" />
         </button>
       </div>
 
       {/* Headline Section */}
-      <div className="px-6 mt-8">
-        <h1 className="text-[36px] font-bold text-gray-900 leading-[1.15]" style={{ fontFamily: "Instrument Serif, serif" }}>
+      <div className="mt-8 px-6">
+        <h1 className="text-[36px] font-bold text-gray-900 leading-[1.15]" style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}>
           One last upload. Ever.
         </h1>
-        <p className="text-[15px] text-gray-500 mt-3 leading-[1.5]" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
+        <p className="text-[15px] text-gray-500 mt-3 leading-[1.5]" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
           Take a photo or upload an image of any government ID.
         </p>
-        <p className="text-[12px] text-gray-500 mt-2 leading-[1.5]" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
+        <p className="text-[12px] text-gray-500 mt-2 leading-[1.5]" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
           Your ID is processed in protected hardware and immediately deleted. Not even Dokimos can see it.
         </p>
       </div>
@@ -448,7 +376,7 @@ function Screen02Upload({
       {/* Error message */}
       {error && (
         <div className="px-6 mt-2">
-          <p className="text-[13px] text-red-600" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
+          <p className="text-[13px] text-red-600" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
             {error}
           </p>
         </div>
@@ -456,18 +384,22 @@ function Screen02Upload({
 
       {/* Upload Zone - fills remaining space */}
       <div className="flex-1 px-6 mt-6 mb-6">
-        <button
-          onClick={uploadState === "default" ? handleFileSelect : uploadState === "selected" ? () => { setUploadState("default"); setSelectedFile(null); setPreviewUrl(null); } : undefined}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/jpg,image/png,image/webp"
+          className="sr-only"
+          tabIndex={-1}
+          onChange={onFileInputChange}
+          aria-hidden
+        />
+
+        <div
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          disabled={uploadState === "scanning"}
           className={`relative w-full h-full rounded-2xl border-[1.5px] transition-all ${
-            uploadState === "scanning" ? "cursor-default" : "cursor-pointer hover:border-gray-300"
-          } ${
-            uploadState === "scanning"
-              ? "border-emerald-600 bg-[#F0FDF4]"
-              : uploadState === "selected"
+            uploadState === "selected"
               ? "border-emerald-600 bg-[#F0FDF4]"
               : isDragging
               ? "border-[#4F46E5] border-solid bg-[#EEF2FF]"
@@ -477,29 +409,43 @@ function Screen02Upload({
         >
           {/* Default State */}
           {uploadState === "default" && !isDragging && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <div className="absolute inset-0 flex flex-col items-center justify-center px-4 pb-2">
               {/* Document outline illustration */}
-              <div className="relative w-[120px] h-[80px] rounded-lg border-[1.5px] border-gray-200 mb-5">
+              <div className="relative w-[120px] h-[80px] rounded-lg border-[1.5px] border-gray-200 mb-4">
                 <div className="absolute top-3 left-3 w-[60px] h-1 bg-gray-100 rounded" />
                 <div className="absolute top-6 left-3 w-[40px] h-1 bg-gray-100 rounded" />
                 <div className="absolute top-3 right-3 w-6 h-6 bg-gray-100 rounded" />
               </div>
 
-              <p className="text-[16px] font-medium text-gray-900 mb-2" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
-                Drop your ID here
+              <p className="text-[16px] font-medium text-gray-900 mb-1 text-center" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
+                Add your government ID
               </p>
-              <p className="text-[13px] text-gray-400 mb-5" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
-                or tap to browse your camera roll
+              <p className="text-[13px] text-gray-400 mb-4 text-center max-w-[280px]" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
+                Your device may ask to use the camera or your photo library — only when you choose below.
               </p>
 
-              <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex h-12 w-full max-w-[340px] items-center justify-center gap-2 rounded-xl bg-[#4F46E5] px-4 text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-[#4338CA] active:bg-[#3730A3]"
+                style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+                aria-label="Add government ID from camera or photo library"
+              >
+                <ImagePlus size={20} className="shrink-0" strokeWidth={2} />
+                Add government ID
+              </button>
+
+              <p className="mt-4 text-[12px] text-gray-400 text-center hidden sm:block" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
+                Or drag and drop a file here
+              </p>
+
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                 {["JPG", "PNG", "WebP"].map((format) => (
-                  <div key={format} className="px-3 py-1.5 bg-gray-100 text-gray-600 text-[11px] font-medium rounded-full" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
+                  <div key={format} className="px-3 py-1.5 bg-gray-100 text-gray-600 text-[11px] font-medium rounded-full" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
                     {format}
                   </div>
                 ))}
               </div>
-
             </div>
           )}
 
@@ -511,7 +457,7 @@ function Screen02Upload({
                 <div className="absolute top-6 left-3 w-[40px] h-1 bg-[#4F46E5] rounded" />
                 <div className="absolute top-3 right-3 w-6 h-6 bg-[#4F46E5] rounded" />
               </div>
-              <p className="text-[16px] font-medium text-[#4F46E5]" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
+              <p className="text-[16px] font-medium text-[#4F46E5]" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
                 Release to upload
               </p>
             </div>
@@ -521,7 +467,7 @@ function Screen02Upload({
           {uploadState === "selected" && previewUrl && (
             <div className="absolute inset-0 rounded-2xl overflow-hidden">
               <img src={previewUrl} alt="ID preview" className="w-full h-full object-cover" />
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-emerald-600 text-white text-[12px] font-medium px-4 py-1.5 rounded-full flex items-center gap-1" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-emerald-600 text-white text-[12px] font-medium px-4 py-1.5 rounded-full flex items-center gap-1" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
                 <Check size={12} />
                 ID uploaded
               </div>
@@ -540,69 +486,31 @@ function Screen02Upload({
           )}
 
           {/* Scanning State */}
-          {uploadState === "scanning" && previewUrl && (
-            <div className="absolute inset-0 rounded-2xl overflow-hidden">
-              <img src={previewUrl} alt="ID preview" className="w-full h-full object-cover" />
-              <div className="absolute inset-0 bg-[#0F1B4C] bg-opacity-45 flex flex-col items-center justify-center">
-                <p className="text-[15px] font-medium text-white mb-3" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
-                  Processing inside TEE...
-                </p>
-                <motion.div
-                  className="w-full h-0.5 bg-gradient-to-r from-transparent via-[#4F46E5] to-transparent"
-                  style={{ boxShadow: "0 0 8px #4F46E5" }}
-                  animate={{ y: [0, 200, 0] }}
-                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                />
-                <div className="flex items-center gap-1.5 mt-4">
-                  <motion.div
-                    className="w-1.5 h-1.5 bg-[#4F46E5] rounded-full"
-                    animate={{ scale: [1, 1.3, 1] }}
-                    transition={{ duration: 1, repeat: Infinity, delay: 0 }}
-                  />
-                  <motion.div
-                    className="w-2 h-2 bg-[#4F46E5] rounded-full"
-                    animate={{ scale: [1, 1.3, 1] }}
-                    transition={{ duration: 1, repeat: Infinity, delay: 0.2 }}
-                  />
-                  <motion.div
-                    className="w-1.5 h-1.5 bg-[#4F46E5] rounded-full"
-                    animate={{ scale: [1, 1.3, 1] }}
-                    transition={{ duration: 1, repeat: Infinity, delay: 0.4 }}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-        </button>
+        </div>
       </div>
 
       {/* Fixed Footer Bar */}
       <div className="bg-white border-t border-gray-100 px-6 pt-5 pb-8">
-        {uploadState === "scanning" ? (
-          <p className="text-[12px] text-gray-500 text-center" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
-            This takes about 30 seconds
-          </p>
-        ) : (
-          <button
-            onClick={handleVerify}
-            disabled={uploadState === "default"}
-            className={`w-full h-14 rounded-xl text-[15px] font-medium transition-colors ${
-              uploadState === "selected"
-                ? "bg-[#4F46E5] text-white hover:bg-[#4338CA]"
-                : "bg-gray-200 text-gray-400 cursor-not-allowed"
-            }`}
-            style={{ fontFamily: "Instrument Sans, sans-serif" }}
-          >
-            Verify Document
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={handleContinue}
+          disabled={uploadState === "default"}
+          className={`w-full h-14 rounded-xl text-[15px] font-medium transition-colors ${
+            uploadState === "selected"
+              ? "bg-[#4F46E5] text-white hover:bg-[#4338CA]"
+              : "bg-gray-200 text-gray-400 cursor-not-allowed"
+          }`}
+          style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+        >
+          Continue
+        </button>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
 // Screen 02B - Liveness Check
-function Screen02BLiveness({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
+export function Screen02BLiveness({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [livenessState, setLivenessState] = useState<"ready" | "detecting" | "processing" | "error">("ready");
@@ -698,46 +606,48 @@ function Screen02BLiveness({ onNext, onBack }: { onNext: () => void; onBack: () 
   };
 
   const handleVerifyFace = () => {
-    // Stop camera
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
+    if (videoRef.current && stream) {
+      const video = videoRef.current;
+      const c = document.createElement("canvas");
+      c.width = video.videoWidth;
+      c.height = video.videoHeight;
+      const ctx = c.getContext("2d");
+      ctx?.drawImage(video, 0, 0);
+      const dataUrl = c.toDataURL("image/jpeg", 0.92);
+      try {
+        localStorage.setItem(STORAGE_LIVE_PHOTO, dataUrl);
+      } catch {
+        /* ignore */
+      }
     }
+    stream?.getTracks().forEach((track) => track.stop());
     if (detectionIntervalRef.current) {
       clearInterval(detectionIntervalRef.current);
     }
-    
     setLivenessState("processing");
     setTimeout(() => {
       onNext();
-    }, 2000);
+    }, 500);
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.4 }}
-      className="absolute inset-0 bg-[#FAFAF9] flex flex-col"
-    >
-      <StatusBar />
-      
+    <div className="relative flex min-h-[100dvh] w-full flex-col bg-[#FAFAF9] pt-[env(safe-area-inset-top)]">
       {/* Top Navigation */}
-      <div className="px-6 h-[52px] flex items-center">
+      <div className="flex h-[52px] shrink-0 items-center px-6">
         <button onClick={onBack}>
           <ArrowLeft size={24} className="text-gray-900" />
         </button>
       </div>
 
       {/* Headline Section */}
-      <div className="px-6 mt-8">
-        <h1 className="text-[36px] font-bold text-gray-900 leading-[1.15]" style={{ fontFamily: "Instrument Serif, serif" }}>
+      <div className="mt-8 px-6">
+        <h1 className="text-[36px] font-bold text-gray-900 leading-[1.15]" style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}>
           Making sure it's you.
         </h1>
-        <p className="text-[15px] text-gray-500 mt-3 leading-[1.5]" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
+        <p className="text-[15px] text-gray-500 mt-3 leading-[1.5]" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
           Take a quick selfie to confirm you're the person on this ID.
         </p>
-        <p className="text-[12px] text-gray-500 mt-2 leading-[1.5]" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
+        <p className="text-[12px] text-gray-500 mt-2 leading-[1.5]" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
           Your selfie is processed in protected hardware and immediately deleted. Not even Dokimos can see it.
         </p>
       </div>
@@ -772,10 +682,10 @@ function Screen02BLiveness({ onNext, onBack }: { onNext: () => void; onBack: () 
           {livenessState === "ready" && (
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <div className="w-32 h-40 rounded-full border-[1.5px] border-gray-400 border-dashed mb-5" />
-              <p className="text-[16px] font-medium text-white mb-2" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
+              <p className="text-[16px] font-medium text-white mb-2" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
                 Tap to start camera
               </p>
-              <p className="text-[13px] text-gray-400" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
+              <p className="text-[13px] text-gray-400" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
                 Position your face in the oval
               </p>
             </div>
@@ -785,7 +695,7 @@ function Screen02BLiveness({ onNext, onBack }: { onNext: () => void; onBack: () 
           {livenessState === "detecting" && !faceDetected && (
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <div className="w-48 h-56 rounded-full border-2 border-[#4F46E5] mb-5 animate-pulse" />
-              <p className="text-[15px] font-medium text-white bg-black/50 px-4 py-2 rounded-lg" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
+              <p className="text-[15px] font-medium text-white bg-black/50 px-4 py-2 rounded-lg" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
                 Detecting face...
               </p>
             </div>
@@ -798,7 +708,7 @@ function Screen02BLiveness({ onNext, onBack }: { onNext: () => void; onBack: () 
               <div className="absolute w-12 h-12 rounded-full bg-emerald-600 flex items-center justify-center">
                 <Check size={24} className="text-white" />
               </div>
-              <p className="text-[15px] font-medium text-white bg-emerald-600/90 px-4 py-2 rounded-lg mt-5" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
+              <p className="text-[15px] font-medium text-white bg-emerald-600/90 px-4 py-2 rounded-lg mt-5" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
                 Face detected
               </p>
             </div>
@@ -810,10 +720,10 @@ function Screen02BLiveness({ onNext, onBack }: { onNext: () => void; onBack: () 
               <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
                 <XCircle size={32} className="text-red-600" />
               </div>
-              <p className="text-[16px] font-medium text-white mb-2" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
+              <p className="text-[16px] font-medium text-white mb-2" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
                 Camera access denied
               </p>
-              <p className="text-[13px] text-gray-400 text-center px-8" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
+              <p className="text-[13px] text-gray-400 text-center px-8" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
                 Please enable camera permissions and try again
               </p>
             </div>
@@ -822,7 +732,7 @@ function Screen02BLiveness({ onNext, onBack }: { onNext: () => void; onBack: () 
           {/* Processing State */}
           {livenessState === "processing" && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0F1B4C] bg-opacity-90">
-              <p className="text-[15px] font-medium text-white mb-3" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
+              <p className="text-[15px] font-medium text-white mb-3" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
                 Matching face to ID...
               </p>
               <div className="flex items-center gap-1.5">
@@ -850,7 +760,7 @@ function Screen02BLiveness({ onNext, onBack }: { onNext: () => void; onBack: () 
       {/* Fixed Footer Bar */}
       <div className="bg-white border-t border-gray-100 px-6 pt-5 pb-8">
         {livenessState === "processing" ? (
-          <p className="text-[12px] text-gray-500 text-center" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
+          <p className="text-[12px] text-gray-500 text-center" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
             This takes about 10 seconds
           </p>
         ) : (
@@ -862,140 +772,705 @@ function Screen02BLiveness({ onNext, onBack }: { onNext: () => void; onBack: () 
                 ? "bg-[#4F46E5] text-white hover:bg-[#4338CA]"
                 : "bg-gray-200 text-gray-400 cursor-not-allowed"
             }`}
-            style={{ fontFamily: "Instrument Sans, sans-serif" }}
+            style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
           >
             Verify Face Match
           </button>
         )}
       </div>
-    </motion.div>
+    </div>
   );
 }
 
-// Screen 03 - Vault Dashboard with REAL attestation data
-function Screen03Vault({ 
-  onNext, 
-  onBack, 
-  attestationData 
-}: { 
-  onNext: () => void; 
+/** Calls TEE /verify with stored ID image + live selfie after liveness. */
+export function Screen02VerifyProcessing({
+  onBack,
+  onSuccess,
+  setAttestationData,
+}: {
   onBack: () => void;
-  attestationData: AttestationData | null;
+  onSuccess: () => void;
+  setAttestationData: (data: AttestationData) => void;
 }) {
-  const attributes = attestationData?.attributes || {
-    name: "Test User",
-    ageOver21: true,
-    notExpired: true,
-    nationality: "USA",
-  };
+  const [error, setError] = useState<string | null>(null);
+  const ran = useRef(false);
 
-  const timestamp = attestationData?.timestamp 
+  useEffect(() => {
+    if (ran.current) return;
+    ran.current = true;
+
+    const run = async () => {
+      let idImg: string | null = null;
+      let live: string | null = null;
+      try {
+        idImg = localStorage.getItem("dokimos_stored_image");
+        live = localStorage.getItem(STORAGE_LIVE_PHOTO);
+      } catch {
+        setError("Could not read stored images.");
+        return;
+      }
+      if (!idImg || !live) {
+        setError("Missing ID or selfie. Go back and complete the previous steps.");
+        return;
+      }
+      try {
+        const response = await axios.post("/api/verify", {
+          imageBase64: idImg,
+          livePhotoBase64: live,
+          requestedAttributes: [],
+        });
+        const raw = response.data as AttestationData & {
+          encryptedIdStored?: boolean;
+        };
+        const { encryptedIdStored, ...attestationPayload } = raw;
+        setAttestationData(attestationPayload);
+        if (encryptedIdStored) {
+          try {
+            localStorage.setItem(STORAGE_HAS_ENCRYPTED_ID, "1");
+          } catch {
+            /* ignore */
+          }
+        }
+        try {
+          localStorage.removeItem(STORAGE_LIVE_PHOTO);
+        } catch {
+          /* ignore */
+        }
+        onSuccess();
+      } catch {
+        setError("Verification failed. Please try again.");
+      }
+    };
+
+    void run();
+  }, [onSuccess, setAttestationData]);
+
+  return (
+    <div className="relative flex min-h-[100dvh] w-full flex-col bg-[#FAFAF9] pt-[env(safe-area-inset-top)]">
+      <div className="flex h-[52px] shrink-0 items-center px-6">
+        <button type="button" onClick={onBack}>
+          <ArrowLeft size={24} className="text-gray-900" />
+        </button>
+      </div>
+      <div className="flex flex-1 flex-col items-center justify-center px-6 pb-24">
+        {error ? (
+          <>
+            <p
+              className="text-center text-[15px] text-red-600"
+              style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+            >
+              {error}
+            </p>
+            <button
+              type="button"
+              onClick={onBack}
+              className="mt-6 h-12 rounded-xl bg-[#4F46E5] px-8 text-[15px] font-medium text-white"
+              style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+            >
+              Go back
+            </button>
+          </>
+        ) : (
+          <>
+            <p
+              className="text-[15px] font-medium text-gray-900"
+              style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+            >
+              Verifying in TEE…
+            </p>
+            <p className="mt-2 text-center text-[13px] text-gray-500">
+              OCR, face match, and signing — this can take up to a minute.
+            </p>
+            <div className="mt-8 flex items-center gap-1.5">
+              <motion.div
+                className="h-2 w-2 rounded-full bg-[#4F46E5]"
+                animate={{ scale: [1, 1.3, 1] }}
+                transition={{ duration: 1, repeat: Infinity, delay: 0 }}
+              />
+              <motion.div
+                className="h-2.5 w-2.5 rounded-full bg-[#4F46E5]"
+                animate={{ scale: [1, 1.3, 1] }}
+                transition={{ duration: 1, repeat: Infinity, delay: 0.2 }}
+              />
+              <motion.div
+                className="h-2 w-2 rounded-full bg-[#4F46E5]"
+                animate={{ scale: [1, 1.3, 1] }}
+                transition={{ duration: 1, repeat: Infinity, delay: 0.4 }}
+              />
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const VAULT_DEMO_ATTRIBUTES: Record<string, string | boolean> = {
+  name: "Test User",
+  dateOfBirth: "1990-01-15",
+  ageOver18: true,
+  ageOver21: true,
+  notExpired: true,
+  nationality: "United States",
+  documentType: "Driver's License",
+  documentExpiryDate: "2030-12-31",
+};
+
+function formatVaultAttributeDisplay(
+  key: string,
+  value: string | boolean
+): string {
+  if (typeof value === "boolean") {
+    return value ? "Verified" : "Not verified";
+  }
+  const s = String(value);
+  if (s === "Unknown") return "—";
+  if (key === "dateOfBirth" || key === "documentExpiryDate") {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s.trim());
+    const d = m
+      ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+      : new Date(s);
+    if (!Number.isNaN(d.getTime())) {
+      if (key === "documentExpiryDate") {
+        return `Expires ${d.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })}`;
+      }
+      return d.toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
+  }
+  return s;
+}
+
+// Screen 03 - Identity vault (user-focused, fintech-style layout)
+export function Screen03Vault({
+  onBack,
+  attestationData,
+  showHeaderBack = true,
+}: {
+  onBack?: () => void;
+  attestationData: AttestationData | null;
+  /** When false, vault is the app home (tabs only; no back to onboarding). */
+  showHeaderBack?: boolean;
+}) {
+  const router = useRouter();
+  const { data: session, status: sessionStatus } = useSession();
+  const { setSelectedRequest, setAttestationData } = useDokimosApp();
+
+  const attributes = useMemo(
+    () => attestationData?.attributes ?? VAULT_DEMO_ATTRIBUTES,
+    [attestationData]
+  );
+
+  const documentTypeHeading = useMemo(() => {
+    const v = attributes.documentType;
+    if (typeof v !== "string" || !v.trim() || v === "Unknown") return null;
+    return formatVaultAttributeDisplay("documentType", v);
+  }, [attributes]);
+
+  const cardAttributeEntries = useMemo(
+    () => Object.entries(attributes).filter(([k]) => k !== "documentType"),
+    [attributes]
+  );
+
+  const [pendingRequests, setPendingRequests] = useState<VerificationRequest[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(true);
+  const [proofOpen, setProofOpen] = useState(false);
+  const [hasEncryptedId, setHasEncryptedId] = useState(false);
+  const [reVerifyLoading, setReVerifyLoading] = useState(false);
+  const [reVerifyError, setReVerifyError] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      setHasEncryptedId(localStorage.getItem(STORAGE_HAS_ENCRYPTED_ID) === "1");
+    } catch {
+      setHasEncryptedId(false);
+    }
+  }, []);
+
+  const timestamp = attestationData?.timestamp
     ? new Date(attestationData.timestamp).toLocaleString("en-US", {
-        month: "numeric",
+        month: "short",
         day: "numeric",
         year: "numeric",
         hour: "numeric",
         minute: "2-digit",
         hour12: true,
       })
-    : "4/1/2026 at 5:33 PM";
+    : new Date().toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      });
+
+  const verificationUrl =
+    attestationData?.eigen?.verificationUrl ??
+    getEigenVerificationDashboardUrl(attestationData?.eigen?.appId);
+
+  const truncateMid = (s: string, left = 8, right = 6) => {
+    if (s.length <= left + right + 3) return s;
+    return `${s.slice(0, left)}…${s.slice(-right)}`;
+  };
+
+  const fetchPending = useCallback(async () => {
+    try {
+      let email: string | null =
+        sessionStatus === "authenticated" && session?.user?.email
+          ? session.user.email
+          : null;
+      if (!email) {
+        const userSession = localStorage.getItem("dokimos_user");
+        if (userSession) {
+          try {
+            email = (JSON.parse(userSession) as { email?: string }).email ?? null;
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+      if (!email) {
+        setPendingRequests([]);
+        return;
+      }
+      const response = await axios.get(
+        `/api/requests/user/${encodeURIComponent(email)}`,
+        { timeout: 15000 }
+      );
+      const raw = response.data;
+      const list: VerificationRequest[] = Array.isArray(raw)
+        ? raw
+        : raw && typeof raw === "object" && Array.isArray((raw as { requests?: unknown }).requests)
+          ? (raw as { requests: VerificationRequest[] }).requests
+          : [];
+      setPendingRequests(list.filter((r) => r.status === "pending"));
+    } catch {
+      setPendingRequests([]);
+    } finally {
+      setRequestsLoading(false);
+    }
+  }, [sessionStatus, session?.user?.email]);
+
+  useEffect(() => {
+    if (sessionStatus === "loading") return;
+    void fetchPending();
+    const t = setInterval(fetchPending, 15000);
+    return () => clearInterval(t);
+  }, [sessionStatus, session?.user?.email, fetchPending]);
+
+  const handleReviewRequest = (req: VerificationRequest) => {
+    setSelectedRequest(req);
+    router.push("/app/requests/review");
+  };
+
+  const handleReVerify = async () => {
+    setReVerifyError(null);
+    setReVerifyLoading(true);
+    try {
+      const { data } = await axios.post<AttestationData>(
+        "/api/re-verify",
+        {}
+      );
+      setAttestationData(data);
+    } catch (err: unknown) {
+      const msg =
+        axios.isAxiosError(err) && err.response?.data?.error
+          ? String(err.response.data.error)
+          : "Re-verification failed. Try again or re-upload your ID.";
+      setReVerifyError(msg);
+    } finally {
+      setReVerifyLoading(false);
+    }
+  };
+
+  const sans = "var(--font-instrument-sans), system-ui, sans-serif" as const;
+  const serif = "var(--font-instrument-serif), Georgia, serif" as const;
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.4 }}
-      className="absolute inset-0 bg-white overflow-y-auto"
-    >
-      <StatusBar />
-      
-      <div className="px-6 h-14 flex items-center justify-between">
-        <span className="text-[17px] font-bold text-[#0F1B4C]">Dokimos</span>
+    <div className="relative w-full">
+      <div className="relative flex h-[52px] shrink-0 items-center justify-between gap-2 px-5">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          {showHeaderBack ? (
+            <>
+              <button
+                type="button"
+                onClick={onBack}
+                className="-ml-1 rounded-lg p-1 transition-colors hover:bg-slate-200/60"
+                aria-label="Back"
+              >
+                <ArrowLeft size={24} className="text-slate-900" />
+              </button>
+              <span
+                className="text-[17px] font-bold tracking-tight text-[#0F1B4C]"
+                style={{ fontFamily: sans }}
+              >
+                Dokimos
+              </span>
+            </>
+          ) : null}
+        </div>
+        {!showHeaderBack ? (
+          <span
+            className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[17px] font-bold tracking-tight text-[#0F1B4C]"
+            style={{ fontFamily: sans }}
+          >
+            Dokimos
+          </span>
+        ) : null}
+        <VaultInfoMenu verificationUrl={verificationUrl} />
       </div>
 
-      <div className="px-6 mt-4 pb-8">
-        <div className="w-full bg-white border-l-4 border-emerald-600 p-4 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center flex-shrink-0">
-            <Check size={16} className="text-white" />
+      <div className="space-y-10 px-5 pb-10 pt-2">
+        <section className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm shadow-slate-900/[0.04]">
+          <div className="flex min-w-0 gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-600 shadow-sm">
+              <Check size={20} className="text-white" strokeWidth={2.5} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p
+                className="text-[15px] font-semibold text-emerald-800"
+                style={{ fontFamily: sans }}
+              >
+                Identity verified
+              </p>
+              <p className="mt-0.5 text-[13px] text-slate-500" style={{ fontFamily: sans }}>
+                {timestamp}
+              </p>
+              {attestationData?.reVerified ? (
+                <p className="mt-1 text-[12px] font-medium text-emerald-700" style={{ fontFamily: sans }}>
+                  Refreshed from your stored ID (re-verification)
+                </p>
+              ) : null}
+            </div>
           </div>
-          <div className="flex-1">
-            <p className="text-[15px] font-bold text-emerald-600">Identity Verified</p>
-            <p className="text-[12px] text-gray-500">{timestamp}</p>
-          </div>
-          <div className="bg-[#0F1B4C] text-white text-[11px] font-medium px-3 py-1.5 rounded-full flex items-center gap-1">
-            <Shield size={10} className="text-white" />
-            <span>Processed in TEE</span>
-          </div>
-        </div>
 
-        <div className="mt-6 flex items-center justify-between">
-          <h2 className="text-[18px] font-bold text-gray-900">Your verified details</h2>
-          <span className="text-[14px] text-gray-500">{Object.keys(attributes).length} attributes</span>
-        </div>
-
-        <div className="mt-4 space-y-2.5">
-          {Object.entries(attributes).map(([key, value], idx) => {
-            const labelMap: Record<string, string> = {
-              "name": "Full Name",
-              "dateOfBirth": "Date of Birth",
-              "ageOver21": "Age Over 21",
-              "notExpired": "Document Expiry",
-              "nationality": "Nationality",
-              "documentType": "Document Type"
-            };
-            
-            const label = labelMap[key] || key;
-            
-            const displayValue = typeof value === "boolean" 
-              ? (value ? "Verified" : "Not Verified")
-              : String(value);
-            
-            const isVerified = typeof value === "boolean" && value;
-
-            return (
-              <div key={idx} className="w-full bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">
-                <div className="flex-1">
-                  <p className="text-[12px] uppercase text-gray-400 tracking-wider mb-1" style={{ fontFamily: "Instrument Sans, sans-serif" }}>{label}</p>
-                  <p className={`text-[17px] font-semibold ${isVerified ? "text-emerald-600" : "text-gray-900"}`} style={{ fontFamily: "Instrument Sans, sans-serif" }}>
-                    {displayValue}
-                  </p>
-                </div>
-                <button
-                  onClick={key === "ageOver21" ? onNext : undefined}
-                  className="px-4 py-2 border border-[#4F46E5] text-[#4F46E5] text-[13px] font-medium rounded-full hover:bg-[#EEF2FF] transition-colors"
-                  style={{ fontFamily: "Instrument Sans, sans-serif" }}
-                >
-                  Share
-                </button>
+          {attestationData?.biometricVerification ? (
+            <div
+              className={`mt-6 flex items-start gap-3 rounded-xl border px-4 py-3 ${
+                attestationData.biometricVerification.faceMatch
+                  ? "border-emerald-200 bg-emerald-50/60"
+                  : "border-amber-200 bg-amber-50/70"
+              }`}
+            >
+              {attestationData.biometricVerification.faceMatch ? (
+                <Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" strokeWidth={2.5} />
+              ) : (
+                <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" strokeWidth={2.5} />
+              )}
+              <div className="min-w-0">
+                <p className="text-[14px] font-semibold text-slate-900" style={{ fontFamily: sans }}>
+                  {attestationData.biometricVerification.faceMatch
+                    ? "Face matched to ID"
+                    : "Face match check did not pass"}
+                </p>
+                <p className="mt-1 text-[12px] text-slate-600" style={{ fontFamily: sans }}>
+                  Confidence{" "}
+                  {(attestationData.biometricVerification.confidence * 100).toFixed(1)}%
+                  {attestationData.biometricVerification.error
+                    ? ` — ${attestationData.biometricVerification.error}`
+                    : ""}
+                </p>
               </div>
-            );
-          })}
-        </div>
+            </div>
+          ) : null}
 
-        <p className="text-[13px] text-gray-500 text-center mt-6 px-4 leading-relaxed">
-          Tap Share on any attribute to send a verified proof — without sharing your actual ID.
-        </p>
+          <div className="mt-7 border-t border-slate-100 pt-7">
+            <h2
+              className="text-[28px] font-semibold tracking-tight text-slate-900 sm:text-[30px]"
+              style={{ fontFamily: serif }}
+            >
+              Your Identity Vault
+            </h2>
+            {documentTypeHeading ? (
+              <div className="mt-3">
+                <p
+                  className="text-[11px] font-medium uppercase tracking-[0.06em] text-slate-500"
+                  style={{ fontFamily: sans }}
+                >
+                  Document type
+                </p>
+                <p
+                  className="mt-0.5 text-[15px] font-semibold text-slate-900"
+                  style={{ fontFamily: sans }}
+                >
+                  {documentTypeHeading}
+                </p>
+              </div>
+            ) : null}
+            <p
+              className="mt-4 max-w-prose text-[14px] leading-relaxed text-slate-600"
+              style={{ fontFamily: sans }}
+            >
+              When companies need to verify your identity, you can choose to approve or decline. Your
+              details are always private.
+            </p>
+            <p className="mt-2 text-[13px] text-slate-500" style={{ fontFamily: sans }}>
+              {cardAttributeEntries.length}{" "}
+              {cardAttributeEntries.length === 1 ? "attribute" : "attributes"} verified
+            </p>
+          </div>
+
+          <div className="mt-8 space-y-2">
+            {cardAttributeEntries.map(([key, value], idx) => {
+              const labelMap: Record<string, string> = {
+                name: "Full name",
+                dateOfBirth: "Date of birth",
+                ageOver18: "Age over 18",
+                ageOver21: "Age over 21",
+                notExpired: "Document expiry",
+                nationality: "Nationality",
+                documentExpiryDate: "Document expiry date",
+              };
+              const label = labelMap[key] || key;
+              const displayValue = formatVaultAttributeDisplay(key, value);
+              const isVerified = typeof value === "boolean" && value;
+
+              return (
+                <div
+                  key={idx}
+                  className="flex items-center gap-4 rounded-xl border border-slate-200/90 bg-slate-50/50 px-4 py-4"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className="text-[11px] font-medium uppercase tracking-[0.06em] text-slate-500"
+                      style={{ fontFamily: sans }}
+                    >
+                      {label}
+                    </p>
+                    <p
+                      className={`mt-1 text-[16px] font-semibold leading-snug ${
+                        isVerified ? "text-emerald-700" : "text-slate-900"
+                      }`}
+                      style={{ fontFamily: sans }}
+                    >
+                      {displayValue}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {hasEncryptedId && (
+          <section
+            className="rounded-2xl border border-emerald-200/80 bg-emerald-50/40 p-5"
+            aria-labelledby="reverify-heading"
+          >
+            <h3
+              id="reverify-heading"
+              className="text-[15px] font-semibold text-slate-900"
+              style={{ fontFamily: sans }}
+            >
+              Re-verify without re-uploading
+            </h3>
+            <p className="mt-2 text-[13px] leading-relaxed text-slate-600" style={{ fontFamily: sans }}>
+              Your ID image is encrypted and held in the verification service memory (demo) so you can
+              refresh your attestation after a new session or device—without uploading again.
+            </p>
+            {sessionStatus === "authenticated" ? (
+              <button
+                type="button"
+                onClick={handleReVerify}
+                disabled={reVerifyLoading}
+                className="mt-4 h-11 w-full rounded-xl border border-emerald-700/30 bg-white text-[14px] font-semibold text-emerald-900 shadow-sm transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+                style={{ fontFamily: sans }}
+              >
+                {reVerifyLoading ? "Re-verifying…" : "Re-verify identity"}
+              </button>
+            ) : (
+              <p className="mt-3 text-[13px] text-slate-600" style={{ fontFamily: sans }}>
+                Sign in with Google to re-verify using your stored ID.
+              </p>
+            )}
+            {reVerifyError && (
+              <p className="mt-3 text-[13px] text-red-600" role="alert" style={{ fontFamily: sans }}>
+                {reVerifyError}
+              </p>
+            )}
+          </section>
+        )}
+
+        <section aria-labelledby="pending-heading">
+          <div className="mb-4 flex items-baseline justify-between gap-3">
+            <h3
+              id="pending-heading"
+              className="text-[13px] font-semibold uppercase tracking-[0.08em] text-slate-500"
+              style={{ fontFamily: sans }}
+            >
+              Pending requests
+            </h3>
+            {!requestsLoading && pendingRequests.length > 0 && (
+              <span className="text-[12px] font-medium text-slate-500" style={{ fontFamily: sans }}>
+                {pendingRequests.length} active
+              </span>
+            )}
+          </div>
+
+          {requestsLoading ? (
+            <div
+              className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-[14px] text-slate-500"
+              style={{ fontFamily: sans }}
+            >
+              Loading requests…
+            </div>
+          ) : pendingRequests.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-5 py-10 text-center">
+              <Clock className="mx-auto mb-3 h-8 w-8 text-slate-300" strokeWidth={1.5} aria-hidden />
+              <p className="text-[15px] font-medium text-slate-700" style={{ fontFamily: sans }}>
+                Nothing pending
+              </p>
+              <p className="mt-1 text-[13px] leading-relaxed text-slate-500" style={{ fontFamily: sans }}>
+                When an organization asks for a verified proof, it will show up here.
+              </p>
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {pendingRequests.map((req) => (
+                <li key={req.requestId}>
+                  <button
+                    type="button"
+                    onClick={() => handleReviewRequest(req)}
+                    className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-4 text-left shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50/80"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-[15px] font-semibold text-slate-900" style={{ fontFamily: sans }}>
+                        {req.verifierName || "Verification request"}
+                      </p>
+                      <p className="mt-0.5 text-[13px] text-slate-500" style={{ fontFamily: sans }}>
+                        {req.requestedAttributes.length}{" "}
+                        {req.requestedAttributes.length === 1 ? "attribute" : "attributes"} requested
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-[13px] font-medium text-emerald-700" style={{ fontFamily: sans }}>
+                      Review →
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {!requestsLoading && pendingRequests.length > 0 && (
+            <Link
+              href="/app/requests"
+              className="mt-3 block text-center text-[13px] font-medium text-slate-600 underline decoration-slate-300 underline-offset-4 hover:text-slate-900"
+              style={{ fontFamily: sans }}
+            >
+              View all requests
+            </Link>
+          )}
+        </section>
+
+        {attestationData && (
+          <section className="rounded-xl border border-slate-200 bg-white shadow-sm shadow-slate-900/[0.03]">
+            <button
+              type="button"
+              id="cryptographic-proof"
+              onClick={() => setProofOpen((o) => !o)}
+              className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
+              aria-expanded={proofOpen}
+            >
+              <span
+                className="text-[15px] font-semibold text-slate-900"
+                style={{ fontFamily: sans }}
+              >
+                Cryptographic proof
+              </span>
+              <ChevronDown
+                className={`h-5 w-5 shrink-0 text-slate-400 transition-transform ${proofOpen ? "rotate-180" : ""}`}
+                aria-hidden
+              />
+            </button>
+            {proofOpen && (
+              <div className="space-y-4 border-t border-slate-100 px-5 pb-5 pt-4">
+                <p className="text-[13px] leading-relaxed text-slate-600" style={{ fontFamily: sans }}>
+                  Independent verification for auditors and partners. This does not expose your raw ID
+                  data.
+                </p>
+                <dl className="space-y-3 text-[12px]">
+                  <div>
+                    <dt className="font-medium text-slate-500">Message hash</dt>
+                    <dd className="mt-0.5 font-mono text-[11px] text-slate-800 break-all">
+                      {truncateMid(attestationData.messageHash)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-slate-500">Signature</dt>
+                    <dd className="mt-0.5 font-mono text-[11px] text-slate-800 break-all">
+                      {truncateMid(attestationData.signature, 10, 8)}
+                    </dd>
+                  </div>
+                </dl>
+                <a
+                  href={verificationUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-emerald-800 hover:text-emerald-900"
+                  style={{ fontFamily: sans }}
+                >
+                  Open verification dashboard
+                  <ExternalLink size={14} className="opacity-80" aria-hidden />
+                </a>
+              </div>
+            )}
+          </section>
+        )}
       </div>
-    </motion.div>
+    </div>
   );
 }
 
-// Screen 04 - Share Modal
-function Screen04Share({ 
-  onNext, 
-  onBack, 
+// Screen 04 - Review & approve verifier request (full page inside app shell)
+export function Screen04Share({
+  onNext,
+  onAfterDeny,
   selectedRequest,
-  storedImageData,
-  setAttestationData
-}: { 
-  onNext: () => void; 
-  onBack: () => void;
+  setAttestationData,
+}: {
+  onNext: () => void;
+  /** After successful deny API — return user to Requests tab */
+  onAfterDeny: () => void;
   selectedRequest: VerificationRequest | null;
-  storedImageData: string | null;
   setAttestationData: (data: AttestationData) => void;
 }) {
+  const { storedImageData, setStoredImageData } = useDokimosApp();
   const [submitting, setSubmitting] = useState(false);
+  const reviewFileRef = useRef<HTMLInputElement>(null);
+
+  const onReviewPickFile = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const ALLOWED = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!ALLOWED.includes(file.type.toLowerCase())) {
+      alert("Please choose a JPG, PNG, or WebP image.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Image must be 10MB or smaller.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const base64 = dataUrl.split(",")[1];
+      setStoredImageData(base64);
+      try {
+        localStorage.setItem("dokimos_stored_image", base64);
+      } catch {
+        /* ignore */
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleApprove = async () => {
     if (!selectedRequest || !storedImageData) {
@@ -1037,7 +1512,7 @@ function Screen04Share({
         approved: false,
       });
 
-      onBack(); // Go back to history
+      onAfterDeny();
     } catch (error) {
       console.error("Failed to deny request:", error);
       alert("Failed to deny request. Please try again.");
@@ -1048,12 +1523,15 @@ function Screen04Share({
 
   const formatAttributeName = (attr: string) => {
     const map: Record<string, string> = {
+      ageOver18: "Age Over 18",
       ageOver21: "Age Over 21",
       name: "Full Name",
       dateOfBirth: "Date of Birth",
       nationality: "Nationality",
       notExpired: "Document Not Expired",
       documentType: "Document Type",
+      documentExpiryDate: "Document Expiry Date",
+      address: "Address",
     };
     return map[attr] || attr;
   };
@@ -1074,45 +1552,38 @@ function Screen04Share({
   const companyInitial = companyName.charAt(0);
   const requestedAttrs = selectedRequest?.requestedAttributes || ["name", "ageOver21", "notExpired"];
   const requestTime = selectedRequest ? getRelativeTime(selectedRequest.createdAt) : "2 minutes ago";
+  const wfLabel = workflowDisplayName(selectedRequest?.workflow);
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.4 }}
-      className="absolute inset-0"
-    >
-      {/* Blurred background */}
-      <div className="absolute inset-0 bg-gray-400/50 backdrop-blur-sm" onClick={onBack} />
-
-      {/* Bottom sheet */}
-      <motion.div
-        initial={{ y: 844 }}
-        animate={{ y: 0 }}
-        exit={{ y: 844 }}
-        transition={{ type: "spring", damping: 30 }}
-        className="absolute bottom-0 left-0 right-0 bg-white rounded-t-[24px] px-6 pt-6 pb-10"
-        style={{ maxHeight: "85vh" }}
-      >
-        <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-6" />
-
+    <div className="relative w-full px-5 pb-8 pt-4">
+      <input
+        ref={reviewFileRef}
+        type="file"
+        accept="image/jpeg,image/jpg,image/png,image/webp"
+        className="sr-only"
+        tabIndex={-1}
+        onChange={onReviewPickFile}
+        aria-hidden
+      />
+      <div className="mx-auto w-full max-w-md rounded-[28px] border border-gray-100/90 bg-white p-6 shadow-[0_4px_24px_rgba(15,23,42,0.06)]">
         {/* Company header with trust badge */}
-        <div className="flex items-start gap-3 mb-3">
+        <div className="mb-3 flex items-start gap-3">
           <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium flex-shrink-0">
             {companyInitial}
           </div>
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
-              <p className="text-[28px] font-bold text-gray-900 leading-tight" style={{ fontFamily: "Instrument Serif, serif" }}>
+              <p className="text-[28px] font-bold text-gray-900 leading-tight" style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}>
                 {companyName}
               </p>
               <div className="px-2 py-0.5 bg-blue-50 border border-blue-200 rounded text-[10px] font-medium text-blue-700">
                 Verified Partner
               </div>
             </div>
-            <p className="text-[13px] text-gray-500 mb-1" style={{ fontFamily: "Instrument Sans, sans-serif" }}>Required to open a brokerage account</p>
-            <p className="text-[11px] text-gray-400" style={{ fontFamily: "Instrument Sans, sans-serif" }}>Requested {requestTime}</p>
+            <p className="text-[13px] text-gray-500 mb-1" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
+              {wfLabel}
+            </p>
+            <p className="text-[11px] text-gray-400" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>Requested {requestTime}</p>
           </div>
         </div>
 
@@ -1122,7 +1593,7 @@ function Screen04Share({
         <div className="space-y-0 mb-4">
           {requestedAttrs.map((attr, idx) => (
             <div key={idx} className="py-3.5 border-b border-gray-100">
-              <p className="text-[16px] font-semibold text-gray-900" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
+              <p className="text-[16px] font-semibold text-gray-900" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
                 {formatAttributeName(attr)}
               </p>
             </div>
@@ -1133,20 +1604,56 @@ function Screen04Share({
         <div className="mb-3 bg-[#F0FDF4] rounded-lg p-3.5 flex items-start gap-2.5">
           <Shield size={17} className="text-emerald-600 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-[13px] text-gray-700 leading-relaxed" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
+            <p className="text-[13px] text-gray-700 leading-relaxed" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
               {companyName} receives proof you meet these {requestedAttrs.length} requirements. They cannot see your ID photo or any other personal details.
             </p>
-            <p className="text-[11px] text-emerald-700 mt-1.5 font-medium" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
+            <p className="text-[11px] text-emerald-700 mt-1.5 font-medium" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
               Verified by Intel TDX Secure Enclave
             </p>
           </div>
         </div>
 
+        <div className="mb-4 rounded-xl border border-dashed border-gray-200 bg-gray-50/80 p-4">
+          <p className="mb-2 text-[13px] font-medium text-gray-800" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
+            Government ID
+          </p>
+          {storedImageData ? (
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-[13px] text-emerald-700" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
+                ID image ready for this approval.
+              </p>
+              <button
+                type="button"
+                onClick={() => reviewFileRef.current?.click()}
+                className="text-[13px] font-semibold text-[#4F46E5] underline-offset-2 hover:underline"
+                style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+              >
+                Change photo
+              </button>
+            </div>
+          ) : (
+            <>
+              <p className="mb-3 text-[12px] text-gray-500" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
+                Choose a photo of your ID. On your phone, you can take a picture or pick from your library.
+              </p>
+              <button
+                type="button"
+                onClick={() => reviewFileRef.current?.click()}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#4F46E5] py-3 text-[15px] font-semibold text-white hover:bg-[#4338CA]"
+                style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+              >
+                <ImagePlus size={18} strokeWidth={2} />
+                Choose photo
+              </button>
+            </>
+          )}
+        </div>
+
         <button
           onClick={handleApprove}
-          disabled={submitting}
+          disabled={submitting || !storedImageData}
           className="w-full h-14 bg-[#4F46E5] rounded-xl text-white text-[15px] font-semibold mt-2 flex items-center justify-center gap-2 hover:bg-[#4338CA] transition-colors disabled:opacity-50"
-          style={{ fontFamily: "Instrument Sans, sans-serif" }}
+          style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
         >
           <Shield size={16} className="text-white" />
           {submitting ? "Approving..." : "Approve and Share"}
@@ -1155,18 +1662,18 @@ function Screen04Share({
         <button 
           onClick={handleDeny}
           disabled={submitting}
-          className="w-full h-14 bg-white border border-gray-200 rounded-xl text-[#EF4444] text-[15px] font-semibold mt-3 hover:bg-gray-50 transition-colors disabled:opacity-50"
-          style={{ fontFamily: "Instrument Sans, sans-serif" }}
+          className="mt-3 h-14 w-full rounded-xl border border-gray-200 bg-white text-[15px] font-semibold text-[#EF4444] transition-colors hover:bg-gray-50 disabled:opacity-50"
+          style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
         >
           {submitting ? "Processing..." : "Deny"}
         </button>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }
 
 // Screen 05 - Verification Receipt with REAL attestation data
-function Screen05Receipt({ 
+export function Screen05Receipt({ 
   onNext, 
   onBack,
   attestationData,
@@ -1195,34 +1702,30 @@ function Screen05Receipt({
     : "April 1, 2026";
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.4 }}
-      className="absolute inset-0 bg-white overflow-y-auto"
-    >
-      <StatusBar />
-      
-      <div className="px-6 py-4">
-        <h1 className="text-[17px] font-bold text-[#0F1B4C] text-center" style={{ fontFamily: "Instrument Sans, sans-serif" }}>Dokimos</h1>
-      </div>
+    <div className="relative w-full">
+      <div className="px-5 pb-8 pt-6">
+        <h1
+          className="text-center text-[17px] font-bold text-[#0F1B4C]"
+          style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+        >
+          Dokimos
+        </h1>
 
-      <div className="flex flex-col items-center px-6 mt-8 pb-12">
+      <div className="mt-8 flex flex-col items-center px-1 pb-4">
         <div className="w-20 h-20 rounded-full bg-emerald-600 flex items-center justify-center mb-5">
           <Check size={40} className="text-white" />
         </div>
 
-        <h2 className="text-[56px] font-bold text-emerald-600 mb-4" style={{ fontFamily: "Instrument Serif, serif" }}>
+        <h2 className="text-[56px] font-bold text-emerald-600 mb-4" style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}>
           Verified
         </h2>
 
         <div className="w-full h-px bg-gray-200 my-4" />
 
-        <p className="text-[22px] font-medium text-gray-900 mb-2" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
+        <p className="text-[22px] font-medium text-gray-900 mb-2" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
           Shared with {companyName}
         </p>
-        <p className="text-[13px] text-gray-500 mb-4" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
+        <p className="text-[13px] text-gray-500 mb-4" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
           Verified on {timestamp}
         </p>
 
@@ -1233,15 +1736,15 @@ function Screen05Receipt({
               <Shield className="w-6 h-6 text-white" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-indigo-900" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
+              <p className="text-sm font-semibold text-indigo-900" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
                 Powered by EigenCompute
               </p>
-              <p className="text-xs text-indigo-600" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
+              <p className="text-xs text-indigo-600" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
                 Intel TDX Trusted Execution Environment
               </p>
             </div>
           </div>
-          <p className="text-xs text-indigo-700 leading-relaxed" style={{ fontFamily: "Instrument Sans, sans-serif" }}>
+          <p className="text-xs text-indigo-700 leading-relaxed" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
             This verification ran in secure hardware. The cryptographic proof can be independently verified by anyone using Eigen's attestation infrastructure.
           </p>
         </div>
@@ -1286,7 +1789,10 @@ function Screen05Receipt({
             </a>
 
             <a
-              href={(attestationData as any).eigen?.verificationUrl || "https://verify-sepolia.eigencloud.xyz/app/0x5911a27103C4de497fCB5C00D8e19962EEF0008E"}
+              href={
+                attestationData?.eigen?.verificationUrl ??
+                getEigenVerificationDashboardUrl(attestationData?.eigen?.appId)
+              }
               target="_blank"
               rel="noopener noreferrer"
               className="w-full h-12 border border-gray-200 rounded-xl px-4 flex items-center justify-between mb-6 hover:bg-gray-50 transition-colors"
@@ -1321,225 +1827,415 @@ function Screen05Receipt({
           )}
         </div>
 
-        <p className="text-[11px] text-gray-400 text-center mt-6">
+        <p className="mt-6 text-center text-[11px] text-gray-400">
           Issued by Dokimos · Cryptographic identity infrastructure
         </p>
+
+        <button
+          type="button"
+          onClick={onNext}
+          className="mt-8 h-14 w-full max-w-md rounded-xl bg-[#4F46E5] text-[15px] font-semibold text-white transition-colors hover:bg-[#4338CA]"
+          style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+        >
+          Done
+        </button>
       </div>
-    </motion.div>
+      </div>
+    </div>
   );
 }
 
-// Screen 06 - History
-function Screen06History({ 
-  onBack, 
-  setCurrentScreen, 
-  setSelectedRequest 
-}: { 
-  onBack: () => void;
-  setCurrentScreen: (screen: number) => void;
-  setSelectedRequest: (request: VerificationRequest) => void;
+type ActivityTimeFilter = "all" | "month" | "quarter" | "older";
+
+const COMPANY_BADGE_COLORS = [
+  "#4F46E5",
+  "#059669",
+  "#DC2626",
+  "#EA580C",
+  "#7C3AED",
+  "#0891B2",
+  "#DB2777",
+] as const;
+
+function getCompanyBadgeColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return COMPANY_BADGE_COLORS[Math.abs(hash) % COMPANY_BADGE_COLORS.length];
+}
+
+/** For approved rows, list attestation attribute keys; otherwise requested attributes. */
+function getDisplayedAttributes(request: VerificationRequest): string[] {
+  if (
+    request.status === "approved" &&
+    request.attestation &&
+    typeof request.attestation === "object"
+  ) {
+    const att = request.attestation as { attributes?: Record<string, unknown> };
+    if (att.attributes && typeof att.attributes === "object") {
+      const keys = Object.keys(att.attributes);
+      if (keys.length > 0) return keys;
+    }
+  }
+  return request.requestedAttributes ?? [];
+}
+
+function requestSortDate(r: VerificationRequest): number {
+  const t = r.completedAt || r.createdAt;
+  return new Date(t).getTime();
+}
+
+function matchesActivityFilter(r: VerificationRequest, f: ActivityTimeFilter): boolean {
+  const d = new Date(r.completedAt || r.createdAt);
+  if (f === "all") return true;
+  const now = new Date();
+  if (f === "month") {
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    return d >= startOfMonth;
+  }
+  if (f === "quarter") {
+    const cutoff = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+    return d >= cutoff;
+  }
+  if (f === "older") {
+    const cutoff = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+    return d < cutoff;
+  }
+  return true;
+}
+
+// Screen 06 — Activity / history (SEQ 06 layout: filters + list rows)
+export function Screen06History({
+  onReviewRequest,
+}: {
+  onReviewRequest: (request: VerificationRequest) => void;
 }) {
+  const { data: session, status: sessionStatus } = useSession();
   const [requests, setRequests] = useState<VerificationRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [timeFilter, setTimeFilter] = useState<ActivityTimeFilter>("all");
 
   const fetchRequests = async () => {
     try {
-      // Get user email from session (for demo, use pranavi@example.com)
-      const userSession = localStorage.getItem("dokimos_user");
-      if (!userSession) return;
-      
-      const { email } = JSON.parse(userSession);
+      setFetchError(null);
+      let email: string | null =
+        sessionStatus === "authenticated" && session?.user?.email
+          ? session.user.email
+          : null;
+      if (!email) {
+        const userSession = localStorage.getItem("dokimos_user");
+        if (userSession) {
+          try {
+            email = (JSON.parse(userSession) as { email?: string }).email ?? null;
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+      if (!email) {
+        setRequests([]);
+        return;
+      }
+
       const response = await axios.get(
         `/api/requests/user/${encodeURIComponent(email)}`,
         { timeout: 15000 }
       );
-      setRequests(response.data);
+      const raw = response.data;
+      const list: VerificationRequest[] = Array.isArray(raw)
+        ? raw
+        : raw && typeof raw === "object" && Array.isArray((raw as { requests?: unknown }).requests)
+          ? (raw as { requests: VerificationRequest[] }).requests
+          : [];
+      setRequests(list);
     } catch (err) {
       console.error("Failed to fetch requests:", err);
+      setFetchError("Could not load your verification history. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    if (sessionStatus === "loading") return;
+
     fetchRequests();
-    
-    // Poll for new requests every 10 seconds
     const interval = setInterval(fetchRequests, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [sessionStatus, session?.user?.email]);
 
   const handleReviewRequest = (request: VerificationRequest) => {
-    setSelectedRequest(request);
-    setCurrentScreen(6); // Navigate to Screen 04 (Share Modal)
+    onReviewRequest(request);
   };
 
-  const getRelativeTime = (timestamp: string) => {
-    const now = new Date();
-    const then = new Date(timestamp);
-    const diffMs = now.getTime() - then.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-    return then.toLocaleDateString();
+  const displayTime = (r: VerificationRequest) => {
+    const ts = r.status === "pending" ? r.createdAt : r.completedAt || r.createdAt;
+    return formatActivityRelative(ts);
   };
 
   const formatAttributeName = (attr: string) => {
     const map: Record<string, string> = {
       ageOver21: "Age Over 21",
+      ageOver18: "Age Over 18",
       name: "Full Name",
+      fullName: "Full Name",
       dateOfBirth: "Date of Birth",
       nationality: "Nationality",
-      notExpired: "Document Not Expired",
+      notExpired: "Document not expired",
+      documentNotExpired: "Document not expired",
       documentType: "Document Type",
+      documentExpiryDate: "Document Expiry Date",
+      address: "Address",
     };
     return map[attr] || attr;
   };
 
-  const pendingRequests = requests.filter(r => r.status === 'pending');
-  const completedRequests = requests.filter(r => r.status === 'approved' || r.status === 'denied');
+  const pendingList = useMemo(
+    () =>
+      requests
+        .filter((r) => r.status === "pending")
+        .sort((a, b) => requestSortDate(b) - requestSortDate(a)),
+    [requests]
+  );
+
+  const completedFiltered = useMemo(() => {
+    return requests
+      .filter((r) => r.status !== "pending")
+      .filter((r) => matchesActivityFilter(r, timeFilter))
+      .sort((a, b) => requestSortDate(b) - requestSortDate(a));
+  }, [requests, timeFilter]);
+
+  const sans = "var(--font-instrument-sans), system-ui, sans-serif" as const;
+  const serif = "var(--font-instrument-serif), Georgia, serif" as const;
+
+  const filters: { id: ActivityTimeFilter; label: string }[] = [
+    { id: "all", label: "All" },
+    { id: "month", label: "This month" },
+    { id: "quarter", label: "Last 3 months" },
+    { id: "older", label: "Older" },
+  ];
+
+  const renderRequestCard = (request: VerificationRequest) => {
+    const initial = (request.verifierName ?? "?").charAt(0).toUpperCase();
+    const badgeColor = getCompanyBadgeColor(request.verifierName ?? "");
+    const attrs = getDisplayedAttributes(request);
+    const isPending = request.status === "pending";
+    const approved = request.status === "approved";
+    const denied = request.status === "denied";
+    const wfLabel = workflowDisplayName(request.workflow);
+
+    const RowInner = (
+      <>
+        <div
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[15px] font-semibold text-white shadow-sm"
+          style={{ backgroundColor: badgeColor, fontFamily: sans }}
+        >
+          {initial}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] font-medium text-gray-900" style={{ fontFamily: sans }}>
+            {request.verifierName ?? "Unknown"}
+          </p>
+          <p className="mt-0.5 text-[12px] text-[#6B7280]" style={{ fontFamily: sans }}>
+            {wfLabel}
+          </p>
+          {isPending && (
+            <p className="mt-1 text-[12px] font-medium text-amber-700" style={{ fontFamily: sans }}>
+              Needs your response
+            </p>
+          )}
+          <div className="mt-2 flex flex-col gap-1.5">
+            {attrs.map((attr) => (
+              <div key={attr} className="flex items-center gap-2">
+                {isPending ? (
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-gray-300" aria-hidden />
+                ) : approved ? (
+                  <Check size={14} className="shrink-0 text-[#059669]" strokeWidth={2.5} aria-hidden />
+                ) : (
+                  <XCircle size={14} className="shrink-0 text-gray-400" aria-hidden />
+                )}
+                <span className="text-[13px] text-[#6B7280]" style={{ fontFamily: sans }}>
+                  {formatAttributeName(attr)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="shrink-0 self-start pt-0.5 text-right">
+          <p className="text-[12px] text-[#9CA3AF]" style={{ fontFamily: sans }}>
+            {displayTime(request)}
+          </p>
+          {denied && (
+            <span
+              className="mt-1 inline-block text-[11px] font-semibold text-red-600"
+              style={{ fontFamily: sans }}
+            >
+              Declined
+            </span>
+          )}
+        </div>
+      </>
+    );
+
+    const cardClass =
+      "flex w-full items-start gap-4 rounded-xl border border-[#E5E7EB] bg-white p-4 text-left shadow-sm";
+
+    if (isPending) {
+      return (
+        <button
+          key={request.requestId}
+          type="button"
+          onClick={() => handleReviewRequest(request)}
+          className={`${cardClass} transition-colors hover:bg-gray-50/80`}
+        >
+          {RowInner}
+        </button>
+      );
+    }
+
+    return (
+      <div key={request.requestId} className={cardClass}>
+        {RowInner}
+      </div>
+    );
+  };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.4 }}
-      className="absolute inset-0 bg-white"
-    >
-      <StatusBar />
-      
-      <div className="px-6 h-[52px] flex items-center">
-        <span className="text-[17px] font-bold text-[#0F1B4C]">Dokimos</span>
+    <div className="relative w-full bg-white">
+      <div className="flex h-[52px] shrink-0 items-center px-6">
+        <span className="text-[17px] font-bold text-[#0F1B4C]" style={{ fontFamily: sans }}>
+          Dokimos
+        </span>
       </div>
 
-      <div className="px-6 mt-8 pb-24 overflow-y-auto">
-        <h1 className="text-[32px] font-bold text-gray-900 mb-2" style={{ fontFamily: "Instrument Serif, serif" }}>
-          Verification requests.
+      <div className="px-6 pb-6 pt-2">
+        <h1
+          className="text-[32px] font-bold leading-[1.15] tracking-tight text-gray-900"
+          style={{ fontFamily: serif }}
+        >
+          Where You&apos;re Verified
         </h1>
-        <p className="text-[14px] text-gray-500 mb-6">Companies requesting verified proofs from you.</p>
+        <p className="mt-2 text-[14px] leading-snug text-[#6B7280]" style={{ fontFamily: sans }}>
+          Every place you&apos;ve shared a verified proof.
+        </p>
+      </div>
 
-        {loading ? (
-          <div className="text-center py-12 text-gray-500">Loading...</div>
-        ) : (
-          <>
-            {/* Pending Requests Section */}
-            {pendingRequests.length > 0 && (
-              <>
-                <div className="flex items-center gap-2 mb-4">
-                  <h2 className="text-[13px] uppercase tracking-wide text-gray-900 font-semibold">
-                    PENDING REQUESTS
-                  </h2>
-                  <span className="bg-amber-500 text-white text-[11px] font-bold px-2 py-0.5 rounded-full">
-                    {pendingRequests.length}
-                  </span>
-                </div>
+      {fetchError ? (
+        <div className="px-6 pb-10 pt-4">
+          <p className="text-center text-[14px] text-red-600" style={{ fontFamily: sans }}>
+            {fetchError}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setLoading(true);
+              void fetchRequests();
+            }}
+            className="mx-auto mt-4 block rounded-xl bg-[#4F46E5] px-4 py-2 text-[14px] font-semibold text-white"
+            style={{ fontFamily: sans }}
+          >
+            Retry
+          </button>
+        </div>
+      ) : loading ? (
+        <div className="py-16 text-center text-[14px] text-[#6B7280]" style={{ fontFamily: sans }}>
+          Loading…
+        </div>
+      ) : requests.length === 0 ? (
+        <div className="px-6 pb-16 pt-4 text-center">
+          <p className="text-[15px] text-[#6B7280]" style={{ fontFamily: sans }}>
+            No verification requests yet.
+          </p>
+          <p className="mt-1 text-[13px] text-[#9CA3AF]" style={{ fontFamily: sans }}>
+            When an organization asks for a verified proof, it will show up here.
+          </p>
+        </div>
+      ) : (
+        <>
+          {pendingList.length > 0 ? (
+            <section className="px-6 pb-6" aria-labelledby="pending-heading">
+              <h2
+                id="pending-heading"
+                className="mb-3 text-[13px] font-semibold uppercase tracking-[0.08em] text-[#6B7280]"
+                style={{ fontFamily: sans }}
+              >
+                Pending
+              </h2>
+              <div className="space-y-3">{pendingList.map((r) => renderRequestCard(r))}</div>
+            </section>
+          ) : null}
 
-                <div className="space-y-3 mb-8">
-                  {pendingRequests.map((request) => (
-                    <div key={request.requestId} className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                      <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 font-bold flex-shrink-0">
-                          {request.verifierName.charAt(0)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[15px] font-semibold text-gray-900 mb-1">{request.verifierName}</p>
-                          <p className="text-[13px] text-gray-600 mb-2">
-                            Requesting: {request.requestedAttributes.map(formatAttributeName).join(", ")}
-                          </p>
-                          <p className="text-[12px] text-gray-500">{getRelativeTime(request.createdAt)}</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => handleReviewRequest(request)}
-                        className="w-full mt-3 bg-indigo-600 text-white py-2.5 rounded-lg text-[14px] font-semibold hover:bg-indigo-700 transition-colors"
-                      >
-                        Review Request
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-
-            {/* Past Verifications Section */}
-            <h2 className="text-[13px] uppercase tracking-wide text-gray-900 font-semibold mb-4">
-              PAST VERIFICATIONS
+          <section className="px-6 pb-10" aria-labelledby="completed-heading">
+            <h2
+              id="completed-heading"
+              className="mb-1 text-[13px] font-semibold uppercase tracking-[0.08em] text-[#6B7280]"
+              style={{ fontFamily: sans }}
+            >
+              Completed
             </h2>
+            <p className="mb-3 text-[12px] text-[#9CA3AF]" style={{ fontFamily: sans }}>
+              Filters apply to past verifications.
+            </p>
+            <div
+              className="flex gap-2 overflow-x-auto pb-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              role="tablist"
+              aria-label="Time range for completed"
+            >
+              {filters.map((f) => {
+                const active = timeFilter === f.id;
+                return (
+                  <button
+                    key={f.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setTimeFilter(f.id)}
+                    className={`shrink-0 rounded-full px-4 py-2 text-[13px] font-medium transition-colors ${
+                      active
+                        ? "bg-[#0F1B4C] text-white"
+                        : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                    }`}
+                    style={{ fontFamily: sans }}
+                  >
+                    {f.label}
+                  </button>
+                );
+              })}
+            </div>
 
-            {completedRequests.length === 0 && pendingRequests.length === 0 ? (
-              <div className="text-center py-12">
-                <Shield className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500 text-[14px]">No verification requests yet</p>
-                <p className="text-gray-400 text-[12px] mt-1">Companies will appear here when they request attributes</p>
-              </div>
-            ) : completedRequests.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-400 text-[13px]">No completed verifications yet</p>
-              </div>
+            {completedFiltered.length === 0 ? (
+              <p
+                className="py-10 text-center text-[14px] text-[#6B7280]"
+                style={{ fontFamily: sans }}
+              >
+                No completed activity in this range.
+              </p>
             ) : (
-              <div className="space-y-3">
-                {completedRequests.map((request) => (
-                  <div key={request.requestId} className="bg-white border-b border-gray-100 py-4">
-                    <div className="flex items-start gap-4">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold flex-shrink-0 ${
-                        request.status === 'approved' 
-                          ? 'bg-green-100 text-green-700' 
-                          : 'bg-red-100 text-red-700'
-                      }`}>
-                        {request.verifierName.charAt(0)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="text-[15px] font-medium text-gray-900">{request.verifierName}</p>
-                          <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                            request.status === 'approved'
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-red-100 text-red-700'
-                          }`}>
-                            {request.status === 'approved' ? 'Approved' : 'Denied'}
-                          </span>
-                        </div>
-                        <div className="space-y-1">
-                          {request.requestedAttributes.map((attr, idx) => (
-                            <div key={idx} className="flex items-center gap-2">
-                              <Check size={14} className={request.status === 'approved' ? 'text-emerald-600' : 'text-gray-400'} />
-                              <span className="text-[13px] text-gray-600">{formatAttributeName(attr)}</span>
-                            </div>
-                          ))}
-                        </div>
-                        <p className="text-[12px] text-gray-400 mt-2">{getRelativeTime(request.createdAt)}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <div className="space-y-3">{completedFiltered.map((r) => renderRequestCard(r))}</div>
             )}
-          </>
-        )}
-      </div>
-
-      {/* Bottom Tab Bar */}
-      <div className="absolute bottom-0 left-0 right-0 h-14 bg-white border-t border-gray-200 flex items-center justify-around">
-        <button className="flex flex-col items-center gap-1">
-          <Shield size={20} className="text-gray-500" />
-          <span className="text-[11px] text-gray-500">Vault</span>
-        </button>
-        <button className="flex flex-col items-center gap-1">
-          <div className="w-1 h-1 rounded-full bg-[#4F46E5] mb-1" />
-          <Activity size={20} className="text-[#4F46E5]" />
-          <span className="text-[11px] text-[#4F46E5]">Activity</span>
-        </button>
-        <button className="flex flex-col items-center gap-1">
-          <Settings size={20} className="text-gray-500" />
-          <span className="text-[11px] text-gray-500">Settings</span>
-        </button>
-      </div>
-    </motion.div>
+          </section>
+        </>
+      )}
+    </div>
   );
+}
+
+function formatActivityRelative(timestamp: string): string {
+  const now = new Date();
+  const then = new Date(timestamp);
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfThen = new Date(then.getFullYear(), then.getMonth(), then.getDate());
+  const calendarDiffDays = Math.round(
+    (startOfToday.getTime() - startOfThen.getTime()) / 86400000
+  );
+
+  if (calendarDiffDays === 0) return "Today";
+  if (calendarDiffDays === 1) return "Yesterday";
+  if (calendarDiffDays < 7) {
+    return `${calendarDiffDays} day${calendarDiffDays > 1 ? "s" : ""} ago`;
+  }
+
+  return then.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }

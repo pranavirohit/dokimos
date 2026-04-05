@@ -1067,9 +1067,9 @@
     {
       "type": "frame",
       "id": "Y8ftL",
-      "x": 3199,
-      "y": 3000,
-      "name": "01B — Transition",
+      "x": 550,
+      "y": 5000,
+      "name": "SEQ 01B — Meet",
       "width": 390,
       "height": 844,
       "fill": "#FFFFFF",
@@ -1909,11 +1909,6 @@
                       "id": "0HfNR",
                       "name": "companyName",
                       "fill": "$--text-primary",
-                      "stroke": {
-                        "align": "inside",
-                        "thickness": 1,
-                        "fill": "#000000ff"
-                      },
                       "content": "Acme Brokerage",
                       "fontFamily": "Instrument Serif",
                       "fontSize": 32,
@@ -3075,415 +3070,10 @@
     },
     {
       "type": "frame",
-      "id": "kQ3Ai",
-      "x": 100,
-      "y": 3000,
-      "name": "Copy 01 Landing",
-      "width": 390,
-      "height": 844,
-      "fill": "$--white",
-      "layout": "vertical",
-      "children": [
-        {
-          "type": "frame",
-          "id": "8aOWX",
-          "name": "darkHalf",
-          "width": "fill_container",
-          "height": 380,
-          "fill": "#0F1B4C",
-          "cornerRadius": [
-            0,
-            0,
-            28,
-            28
-          ],
-          "layout": "vertical",
-          "gap": 24,
-          "padding": [
-            64,
-            32
-          ],
-          "justifyContent": "center",
-          "children": [
-            {
-              "type": "text",
-              "id": "JYPLF",
-              "name": "againText",
-              "fill": "$--white",
-              "textGrowth": "fixed-width",
-              "width": "fill_container",
-              "content": "Again?",
-              "textAlign": "center",
-              "fontFamily": "Instrument Serif",
-              "fontSize": 72,
-              "fontWeight": "700"
-            },
-            {
-              "type": "frame",
-              "id": "z66Yq",
-              "name": "pillStrip",
-              "width": "fill_container",
-              "gap": 8,
-              "children": [
-                {
-                  "type": "frame",
-                  "id": "jX6gz",
-                  "name": "p1",
-                  "height": 32,
-                  "fill": "#1E3A5F",
-                  "cornerRadius": 999,
-                  "padding": [
-                    0,
-                    16
-                  ],
-                  "justifyContent": "center",
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "XHUJu",
-                      "name": "p1t",
-                      "fill": "#94A3B8",
-                      "content": "New bank account",
-                      "fontFamily": "Instrument Sans",
-                      "fontSize": 13,
-                      "fontWeight": "normal"
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "heds2",
-                  "name": "p3",
-                  "height": 32,
-                  "fill": "#1E3A5F",
-                  "cornerRadius": 999,
-                  "padding": [
-                    0,
-                    16
-                  ],
-                  "justifyContent": "center",
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "cfgdn",
-                      "name": "p3t",
-                      "fill": "#94A3B8",
-                      "content": "Apartment rental",
-                      "fontFamily": "Instrument Sans",
-                      "fontSize": 13,
-                      "fontWeight": "normal"
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "1g3CD",
-                  "name": "p4",
-                  "height": 32,
-                  "fill": "#1E3A5F",
-                  "cornerRadius": 999,
-                  "padding": [
-                    0,
-                    16
-                  ],
-                  "justifyContent": "center",
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "nzyU9",
-                      "name": "p4t",
-                      "fill": "#94A3B8",
-                      "content": "Freelance platform",
-                      "fontFamily": "Instrument Sans",
-                      "fontSize": 13,
-                      "fontWeight": "normal"
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "xRx7F",
-                  "name": "p5",
-                  "height": 32,
-                  "fill": "#1E3A5F",
-                  "cornerRadius": 999,
-                  "padding": [
-                    0,
-                    16
-                  ],
-                  "justifyContent": "center",
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "dGcZg",
-                      "name": "p5t",
-                      "fill": "#94A3B8",
-                      "content": "Car rental",
-                      "fontFamily": "Instrument Sans",
-                      "fontSize": 13,
-                      "fontWeight": "normal"
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "SxtK1",
-                  "name": "p6",
-                  "height": 32,
-                  "fill": "#1E3A5F",
-                  "cornerRadius": 999,
-                  "padding": [
-                    0,
-                    16
-                  ],
-                  "justifyContent": "center",
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "WP1jL",
-                      "name": "p6t",
-                      "fill": "#94A3B8",
-                      "content": "Background check",
-                      "fontFamily": "Instrument Sans",
-                      "fontSize": 13,
-                      "fontWeight": "normal"
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "31vPx",
-                  "name": "p7",
-                  "height": 32,
-                  "fill": "#1E3A5F",
-                  "cornerRadius": 999,
-                  "padding": [
-                    0,
-                    16
-                  ],
-                  "justifyContent": "center",
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "TykQn",
-                      "name": "p7t",
-                      "fill": "#94A3B8",
-                      "content": "Age verification",
-                      "fontFamily": "Instrument Sans",
-                      "fontSize": 13,
-                      "fontWeight": "normal"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "type": "frame",
-              "id": "JsreL",
-              "name": "stacked",
-              "width": "fill_container",
-              "layout": "vertical",
-              "gap": 4,
-              "alignItems": "center",
-              "children": [
-                {
-                  "type": "text",
-                  "id": "JwJXw",
-                  "name": "ln1",
-                  "fill": "#FFFFFF",
-                  "content": "Another form.",
-                  "lineHeight": 1.8,
-                  "textAlign": "center",
-                  "fontFamily": "Instrument Sans",
-                  "fontSize": 22,
-                  "fontWeight": "normal"
-                },
-                {
-                  "type": "text",
-                  "id": "ljLsG",
-                  "name": "ln2",
-                  "fill": "#FFFFFF",
-                  "content": "Another upload.",
-                  "lineHeight": 1.8,
-                  "textAlign": "center",
-                  "fontFamily": "Instrument Sans",
-                  "fontSize": 22,
-                  "fontWeight": "normal"
-                },
-                {
-                  "type": "text",
-                  "id": "BOJa5",
-                  "name": "ln3",
-                  "fill": "#FFFFFF",
-                  "content": "Another wait.",
-                  "lineHeight": 1.8,
-                  "textAlign": "center",
-                  "fontFamily": "Instrument Sans",
-                  "fontSize": 22,
-                  "fontWeight": "normal"
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "type": "frame",
-          "id": "WdiHO",
-          "layoutPosition": "absolute",
-          "x": 0,
-          "y": 796,
-          "name": "bottomAnchor",
-          "width": 390,
-          "gap": 4,
-          "padding": [
-            0,
-            0,
-            32,
-            0
-          ],
-          "justifyContent": "center",
-          "alignItems": "center",
-          "children": [
-            {
-              "type": "text",
-              "id": "TROFt",
-              "name": "bottomTxt",
-              "fill": "#4F46E5",
-              "content": "Already verified? ",
-              "fontFamily": "Instrument Sans",
-              "fontSize": 14,
-              "fontWeight": "500"
-            },
-            {
-              "type": "text",
-              "id": "TGfAQ",
-              "name": "signLink",
-              "fill": "#4F46E5",
-              "content": "Sign in",
-              "fontFamily": "Instrument Sans",
-              "fontSize": 14,
-              "fontWeight": "600"
-            }
-          ]
-        },
-        {
-          "type": "frame",
-          "id": "liPI7",
-          "name": "whiteHalf",
-          "width": "fill_container",
-          "height": 512,
-          "layout": "vertical",
-          "gap": 24,
-          "padding": [
-            68,
-            28,
-            40,
-            28
-          ],
-          "children": [
-            {
-              "type": "text",
-              "id": "gEFdB",
-              "name": "whiteHead",
-              "fill": "#111827",
-              "textGrowth": "fixed-width",
-              "width": "fill_container",
-              "content": "The last time you'll ever\nupload your ID.",
-              "lineHeight": 1.2,
-              "fontFamily": "Instrument Serif",
-              "fontSize": 36,
-              "fontWeight": "700"
-            },
-            {
-              "type": "text",
-              "id": "tAu1l",
-              "name": "whiteSub",
-              "fill": "#6B7280",
-              "textGrowth": "fixed-width",
-              "width": "fill_container",
-              "content": "Dokimos verifies you once. Every service after gets an instant yes, without ever seeing your documents.",
-              "lineHeight": 1.6,
-              "fontFamily": "Instrument Sans",
-              "fontSize": 16,
-              "fontWeight": "normal"
-            },
-            {
-              "type": "frame",
-              "id": "eob0t",
-              "name": "whiteBtn",
-              "width": "fill_container",
-              "height": 56,
-              "fill": "#4F46E5",
-              "cornerRadius": 12,
-              "effect": {
-                "type": "shadow",
-                "shadowType": "outer",
-                "color": "#4F46E514",
-                "offset": {
-                  "x": 0,
-                  "y": 1
-                },
-                "blur": 2
-              },
-              "justifyContent": "center",
-              "alignItems": "center",
-              "children": [
-                {
-                  "type": "text",
-                  "id": "oes3c",
-                  "name": "whiteBtnTxt",
-                  "fill": "$--white",
-                  "content": "Verify Your Identity — It's Free",
-                  "fontFamily": "Instrument Sans",
-                  "fontSize": 16,
-                  "fontWeight": "600",
-                  "letterSpacing": 0.02
-                }
-              ]
-            },
-            {
-              "type": "text",
-              "id": "0Fbbh",
-              "name": "trustText",
-              "fill": "#6B7280",
-              "textGrowth": "fixed-width",
-              "width": "fill_container",
-              "content": "Your ID stays in protected hardware. Not even Dokimos can access it.",
-              "lineHeight": 1.6,
-              "textAlign": "center",
-              "fontFamily": "Instrument Sans",
-              "fontSize": 14,
-              "fontWeight": "normal"
-            }
-          ]
-        },
-        {
-          "type": "frame",
-          "id": "IWA6S",
-          "name": "statBar",
-          "width": "fill_container",
-          "height": 62,
-          "padding": [
-            0,
-            24
-          ],
-          "justifyContent": "space_between",
-          "alignItems": "center"
-        }
-      ]
-    },
-    {
-      "type": "frame",
       "id": "QLrot",
-      "x": 530,
-      "y": 3000,
-      "name": "Copy 02 Upload",
+      "x": 1450,
+      "y": 5000,
+      "name": "SEQ 02 — Upload",
       "width": 390,
       "height": 844,
       "fill": "$--white",
@@ -3926,9 +3516,9 @@
     {
       "type": "frame",
       "id": "HA2F4",
-      "x": 960,
-      "y": 3000,
-      "name": "Copy 03 Vault",
+      "x": 1900,
+      "y": 5000,
+      "name": "SEQ 03 — Vault",
       "width": 390,
       "height": 844,
       "fill": "$--white",
@@ -4585,9 +4175,9 @@
     {
       "type": "frame",
       "id": "IHxu6",
-      "x": 1390,
-      "y": 3000,
-      "name": "Copy 04 Share",
+      "x": 2350,
+      "y": 5000,
+      "name": "SEQ 04 — Share",
       "width": 390,
       "height": 844,
       "fill": "$--white",
@@ -4753,11 +4343,6 @@
                       "id": "tN1Op",
                       "name": "companyName",
                       "fill": "$--text-primary",
-                      "stroke": {
-                        "align": "inside",
-                        "thickness": 1,
-                        "fill": "#000000ff"
-                      },
                       "content": "Acme Brokerage",
                       "fontFamily": "Instrument Serif",
                       "fontSize": 32,
@@ -5017,9 +4602,9 @@
     {
       "type": "frame",
       "id": "FxBSr",
-      "x": 1820,
-      "y": 3000,
-      "name": "Copy 05 Receipt",
+      "x": 2800,
+      "y": 5000,
+      "name": "SEQ 05 — Receipt",
       "width": 390,
       "height": 844,
       "fill": "$--white",
@@ -5515,9 +5100,9 @@
     {
       "type": "frame",
       "id": "t8mDB",
-      "x": 2250,
-      "y": 3000,
-      "name": "Copy 06 History",
+      "x": 3250,
+      "y": 5000,
+      "name": "SEQ 06 — History",
       "width": 390,
       "height": 844,
       "fill": "#FFFFFF",
@@ -6851,9 +6436,9 @@
     {
       "type": "frame",
       "id": "Oy1kl",
-      "x": 2700,
-      "y": 3000,
-      "name": "01A — Problem State",
+      "x": 100,
+      "y": 5000,
+      "name": "SEQ 01A — Again",
       "width": 390,
       "height": 844,
       "fill": "#0F1B4C",
@@ -7091,9 +6676,9 @@
     {
       "type": "frame",
       "id": "eNgqF",
-      "x": 3766,
-      "y": 3000,
-      "name": "01C — Final State",
+      "x": 1000,
+      "y": 5000,
+      "name": "SEQ 01C — CTA",
       "width": 390,
       "height": 844,
       "fill": "#FFFFFF",
@@ -7202,200 +6787,6 @@
               "fontFamily": "Instrument Serif",
               "fontSize": 40,
               "fontWeight": "700"
-            },
-            {
-              "type": "frame",
-              "id": "Ftwqh",
-              "name": "pillStrip1b",
-              "gap": 8,
-              "children": [
-                {
-                  "type": "frame",
-                  "id": "ayPbb",
-                  "name": "pill1b1",
-                  "height": 32,
-                  "fill": "#F3F4F6",
-                  "cornerRadius": 999,
-                  "stroke": {
-                    "align": "inside",
-                    "thickness": 1,
-                    "fill": "#E5E7EB"
-                  },
-                  "padding": [
-                    0,
-                    16
-                  ],
-                  "justifyContent": "center",
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "yj6rb",
-                      "name": "pill1b1t",
-                      "fill": "#6B7280",
-                      "content": "new bank account",
-                      "fontFamily": "Instrument Sans",
-                      "fontSize": 13,
-                      "fontWeight": "500"
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "i7XQn",
-                  "name": "pill1b2",
-                  "height": 32,
-                  "fill": "#F3F4F6",
-                  "cornerRadius": 999,
-                  "stroke": {
-                    "align": "inside",
-                    "thickness": 1,
-                    "fill": "#E5E7EB"
-                  },
-                  "padding": [
-                    0,
-                    16
-                  ],
-                  "justifyContent": "center",
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "MuQlD",
-                      "name": "pill1b2t",
-                      "fill": "#6B7280",
-                      "content": "apartment rental",
-                      "fontFamily": "Instrument Sans",
-                      "fontSize": 13,
-                      "fontWeight": "500"
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "0FiUG",
-                  "name": "pill1b3",
-                  "height": 32,
-                  "fill": "#F3F4F6",
-                  "cornerRadius": 999,
-                  "stroke": {
-                    "align": "inside",
-                    "thickness": 1,
-                    "fill": "#E5E7EB"
-                  },
-                  "padding": [
-                    0,
-                    16
-                  ],
-                  "justifyContent": "center",
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "x1tcx",
-                      "name": "pill1b3t",
-                      "fill": "#6B7280",
-                      "content": "freelance platform",
-                      "fontFamily": "Instrument Sans",
-                      "fontSize": 13,
-                      "fontWeight": "500"
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "GlBlr",
-                  "name": "pill1b4",
-                  "height": 32,
-                  "fill": "#F3F4F6",
-                  "cornerRadius": 999,
-                  "stroke": {
-                    "align": "inside",
-                    "thickness": 1,
-                    "fill": "#E5E7EB"
-                  },
-                  "padding": [
-                    0,
-                    16
-                  ],
-                  "justifyContent": "center",
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "1W6cl",
-                      "name": "pill1b4t",
-                      "fill": "#6B7280",
-                      "content": "car rental",
-                      "fontFamily": "Instrument Sans",
-                      "fontSize": 13,
-                      "fontWeight": "500"
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "WIELz",
-                  "name": "pill1b5",
-                  "height": 32,
-                  "fill": "#F3F4F6",
-                  "cornerRadius": 999,
-                  "stroke": {
-                    "align": "inside",
-                    "thickness": 1,
-                    "fill": "#E5E7EB"
-                  },
-                  "padding": [
-                    0,
-                    16
-                  ],
-                  "justifyContent": "center",
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "QQDVL",
-                      "name": "pill1b5t",
-                      "fill": "#6B7280",
-                      "content": "background check",
-                      "fontFamily": "Instrument Sans",
-                      "fontSize": 13,
-                      "fontWeight": "500"
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "GOnCG",
-                  "name": "pill1b6",
-                  "height": 32,
-                  "fill": "#F3F4F6",
-                  "cornerRadius": 999,
-                  "stroke": {
-                    "align": "inside",
-                    "thickness": 1,
-                    "fill": "#E5E7EB"
-                  },
-                  "padding": [
-                    0,
-                    16
-                  ],
-                  "justifyContent": "center",
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "xEOVj",
-                      "name": "pill1b6t",
-                      "fill": "#6B7280",
-                      "content": "gig company",
-                      "fontFamily": "Instrument Sans",
-                      "fontSize": 13,
-                      "fontWeight": "500"
-                    }
-                  ]
-                }
-              ]
             }
           ]
         },
@@ -8176,9 +7567,9 @@
     {
       "type": "frame",
       "id": "QNipS",
-      "x": 4300,
-      "y": 3000,
-      "name": "ANIM 01A Problem",
+      "x": 100,
+      "y": 5000,
+      "name": "SEQ 01A — Again",
       "width": 390,
       "height": 844,
       "fill": "#0F1B4C",
@@ -8201,7 +7592,7 @@
           "type": "frame",
           "id": "D0iRq",
           "x": 0,
-          "y": 420,
+          "y": 415.5,
           "name": "a1pills",
           "height": 32,
           "gap": 8,
@@ -8412,9 +7803,9 @@
     {
       "type": "frame",
       "id": "mUYAE",
-      "x": 4750,
-      "y": 3000,
-      "name": "ANIM 01B Transition",
+      "x": 550,
+      "y": 5000,
+      "name": "SEQ 01B — Meet",
       "width": 390,
       "height": 844,
       "fill": "#FFFFFF",
@@ -8432,6 +7823,203 @@
           "fontFamily": "Instrument Serif",
           "fontSize": 64,
           "fontWeight": "700"
+        },
+        {
+          "type": "frame",
+          "id": "YDbiD",
+          "x": 0,
+          "y": 415.5,
+          "name": "a2pills",
+          "height": 32,
+          "gap": 8,
+          "children": [
+            {
+              "type": "frame",
+              "id": "V15bY",
+              "name": "a2p1",
+              "height": 32,
+              "fill": "#F3F4F6",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#E5E7EB"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "YHx9W",
+                  "name": "a2p1t",
+                  "fill": "#6B7280",
+                  "content": "new bank account",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "HDeGc",
+              "name": "a2p2",
+              "height": 32,
+              "fill": "#F3F4F6",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#E5E7EB"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "YcTnx",
+                  "name": "a2p2t",
+                  "fill": "#6B7280",
+                  "content": "apartment rental",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "2Jenp",
+              "name": "a2p3",
+              "height": 32,
+              "fill": "#F3F4F6",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#E5E7EB"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "lcLZZ",
+                  "name": "a2p3t",
+                  "fill": "#6B7280",
+                  "content": "freelance platform",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "gg5n7",
+              "name": "a2p4",
+              "height": 32,
+              "fill": "#F3F4F6",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#E5E7EB"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "xAJ6B",
+                  "name": "a2p4t",
+                  "fill": "#6B7280",
+                  "content": "car rental",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "eTYkx",
+              "name": "a2p5",
+              "height": 32,
+              "fill": "#F3F4F6",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#E5E7EB"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "eZ4s9",
+                  "name": "a2p5t",
+                  "fill": "#6B7280",
+                  "content": "background check",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "eH3Yv",
+              "name": "a2p6",
+              "height": 32,
+              "fill": "#F3F4F6",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#E5E7EB"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "NjPuL",
+                  "name": "a2p6t",
+                  "fill": "#6B7280",
+                  "content": "gig company",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            }
+          ]
         }
       ]
     },
@@ -9047,9 +8635,9 @@
     {
       "type": "frame",
       "id": "W215L",
-      "x": 5200,
-      "y": 3000,
-      "name": "ANIM 01C Final",
+      "x": 1000,
+      "y": 5000,
+      "name": "SEQ 01C — CTA",
       "width": 390,
       "height": 844,
       "fill": "#FFFFFF",
@@ -9122,71 +8710,9 @@
         },
         {
           "type": "frame",
-          "id": "P3NDT",
-          "x": 390,
-          "y": 0,
-          "name": "a3nav",
-          "width": 390,
-          "height": 52,
-          "padding": [
-            0,
-            24
-          ],
-          "justifyContent": "space_between",
-          "alignItems": "center",
-          "children": [
-            {
-              "type": "text",
-              "id": "6wBJ9",
-              "name": "a3word",
-              "fill": "#0F1B4C",
-              "content": "Dokimos",
-              "fontFamily": "Instrument Sans",
-              "fontSize": 17,
-              "fontWeight": "700"
-            },
-            {
-              "type": "text",
-              "id": "X4kzM",
-              "name": "a3signin",
-              "fill": "#6B7280",
-              "content": "Sign in",
-              "fontFamily": "Instrument Sans",
-              "fontSize": 14,
-              "fontWeight": "500"
-            }
-          ]
-        },
-        {
-          "type": "text",
-          "id": "mPlV9",
-          "x": 780,
-          "y": 0,
-          "name": "a3meet",
-          "fill": "#6B7280",
-          "content": "Meet Dokimos.",
-          "fontFamily": "Instrument Sans",
-          "fontSize": 24,
-          "fontWeight": "normal"
-        },
-        {
-          "type": "text",
-          "id": "3VsJb",
-          "x": 946,
-          "y": 0,
-          "name": "a3head",
-          "fill": "#111827",
-          "content": "The last time you'll ever upload your ID.",
-          "lineHeight": 1.15,
-          "fontFamily": "Instrument Serif",
-          "fontSize": 40,
-          "fontWeight": "700"
-        },
-        {
-          "type": "frame",
           "id": "qikjk",
           "x": 0,
-          "y": 420,
+          "y": 415.5,
           "name": "a3pills",
           "height": 32,
           "gap": 8,
@@ -9382,11 +8908,12 @@
         {
           "type": "frame",
           "id": "T4so4",
-          "x": 0,
-          "y": 640,
+          "x": 23,
+          "y": 594,
           "name": "bottomSheet",
-          "width": 390,
-          "fill": "#FFFFFF",
+          "width": 344,
+          "height": 250,
+          "fill": "#0F1B4C",
           "cornerRadius": [
             24,
             24,
@@ -9406,7 +8933,7 @@
               "type": "text",
               "id": "8U1mK",
               "name": "sheetHead",
-              "fill": "#111827",
+              "fill": "#FFFFFF",
               "content": "Get started with Dokimos",
               "textAlign": "center",
               "fontFamily": "Instrument Sans",
@@ -9442,8 +8969,13 @@
               "name": "logInBtn",
               "width": "fill_container",
               "height": 56,
-              "fill": "#F3F4F6",
+              "fill": "#ffffff26",
               "cornerRadius": 12,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#ffffff33"
+              },
               "justifyContent": "center",
               "alignItems": "center",
               "children": [
@@ -9451,7 +8983,7 @@
                   "type": "text",
                   "id": "F8Dlk",
                   "name": "logInText",
-                  "fill": "#111827",
+                  "fill": "#ffffffff",
                   "content": "Log in",
                   "fontFamily": "Instrument Sans",
                   "fontSize": 16,
@@ -9463,85 +8995,215 @@
         },
         {
           "type": "frame",
-          "id": "M6Cpn",
+          "id": "hfGWE",
           "x": 0,
-          "y": 640,
-          "name": "bottomSheet",
-          "width": 390,
-          "fill": "#FFFFFF",
-          "cornerRadius": [
-            24,
-            24,
-            0,
-            0
-          ],
-          "layout": "vertical",
-          "gap": 24,
-          "padding": [
-            32,
-            24,
-            40,
-            24
-          ],
+          "y": 415.5,
+          "name": "a3pills",
+          "height": 32,
+          "gap": 8,
           "children": [
             {
-              "type": "text",
-              "id": "wvT9X",
-              "name": "sheetHead",
-              "fill": "#111827",
-              "content": "Get started with Dokimos",
-              "textAlign": "center",
-              "fontFamily": "Instrument Sans",
-              "fontSize": 22,
-              "fontWeight": "700"
-            },
-            {
               "type": "frame",
-              "id": "lMCKL",
-              "name": "signUpBtn",
-              "width": "fill_container",
-              "height": 56,
-              "fill": "#4F46E5",
-              "cornerRadius": 12,
+              "id": "APxyT",
+              "name": "a3p1",
+              "height": 32,
+              "fill": "#F3F4F6",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#E5E7EB"
+              },
+              "padding": [
+                0,
+                16
+              ],
               "justifyContent": "center",
               "alignItems": "center",
               "children": [
                 {
                   "type": "text",
-                  "id": "YxvM4",
-                  "name": "signUpText",
-                  "fill": "#FFFFFF",
-                  "content": "Sign up",
+                  "id": "r8OQ3",
+                  "name": "a3p1t",
+                  "fill": "#6B7280",
+                  "content": "new bank account",
                   "fontFamily": "Instrument Sans",
-                  "fontSize": 16,
-                  "fontWeight": "700"
+                  "fontSize": 13,
+                  "fontWeight": "500"
                 }
               ]
             },
             {
               "type": "frame",
-              "id": "g2NOl",
-              "name": "logInBtn",
-              "width": "fill_container",
-              "height": 56,
+              "id": "BfH1o",
+              "name": "a3p2",
+              "height": 32,
               "fill": "#F3F4F6",
-              "cornerRadius": 12,
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#E5E7EB"
+              },
+              "padding": [
+                0,
+                16
+              ],
               "justifyContent": "center",
               "alignItems": "center",
               "children": [
                 {
                   "type": "text",
-                  "id": "TOr6S",
-                  "name": "logInText",
-                  "fill": "#111827",
-                  "content": "Log in",
+                  "id": "PQz7J",
+                  "name": "a3p2t",
+                  "fill": "#6B7280",
+                  "content": "apartment rental",
                   "fontFamily": "Instrument Sans",
-                  "fontSize": 16,
-                  "fontWeight": "700"
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "FqGac",
+              "name": "a3p3",
+              "height": 32,
+              "fill": "#F3F4F6",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#E5E7EB"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "nAcd1",
+                  "name": "a3p3t",
+                  "fill": "#6B7280",
+                  "content": "freelance platform",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "dP4JL",
+              "name": "a3p4",
+              "height": 32,
+              "fill": "#F3F4F6",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#E5E7EB"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Zk5hi",
+                  "name": "a3p4t",
+                  "fill": "#6B7280",
+                  "content": "car rental",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "T7Cpj",
+              "name": "a3p5",
+              "height": 32,
+              "fill": "#F3F4F6",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#E5E7EB"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "x5o4R",
+                  "name": "a3p5t",
+                  "fill": "#6B7280",
+                  "content": "background check",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "0g4Fb",
+              "name": "a3p6",
+              "height": 32,
+              "fill": "#F3F4F6",
+              "cornerRadius": 999,
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#E5E7EB"
+              },
+              "padding": [
+                0,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "roDSo",
+                  "name": "a3p6t",
+                  "fill": "#6B7280",
+                  "content": "gig company",
+                  "fontFamily": "Instrument Sans",
+                  "fontSize": 13,
+                  "fontWeight": "500"
                 }
               ]
             }
           ]
+        },
+        {
+          "type": "text",
+          "id": "jKCus",
+          "x": 23,
+          "y": 284,
+          "name": "headlineC",
+          "fill": "#111827",
+          "textGrowth": "fixed-width",
+          "width": 344,
+          "content": "The last time you'll ever need to upload your ID.",
+          "lineHeight": 1.15,
+          "fontFamily": "Instrument Serif",
+          "fontSize": 40,
+          "fontWeight": "700"
         }
       ]
     },
@@ -10940,6 +10602,14 @@
           ]
         }
       ]
+    },
+    {
+      "type": "prompt",
+      "id": "Vikti",
+      "x": 724.1394148020656,
+      "y": 7180.162650602408,
+      "width": 250,
+      "height": 219
     }
   ],
   "variables": {

@@ -15,15 +15,28 @@ This repository is a **demonstration / prototype**. Treat it as **unsafe for pro
 3. **Backend signing key (`MNEMONIC`)**  
    The Fastify server derives an Ethereum signer from `MNEMONIC`. Protect this like a hot wallet key. Use a dedicated key for demos, not a funded personal wallet.
 
+## Implemented hardening (demo)
+
+The Fastify backend (`src/index.ts`) and Next.js verifier app (`dokimos-app-v2`) include baseline controls suitable for a **demo**, not a full production launch:
+
+- **Passwords:** bcrypt hashing (cost factor 10) for users and verifiers; OAuth placeholder passwords are stored as random hashes.
+- **Sessions (verifier):** opaque server-side tokens in an **httpOnly** cookie (`dokimos_verifier_session`), validated against the API; not `localStorage`.
+- **Input validation:** Zod on auth and verification routes; base64 image size and encoding checks (10MB cap).
+- **Rate limiting:** global limit plus stricter limits on auth and expensive routes (`@fastify/rate-limit`).
+- **CORS:** allowlist when `Origin` is present; non-browser clients (no `Origin`) are allowed so Next.js API routes can call the backend.
+- **Errors:** generic messages in production (`NODE_ENV=production`); details only in development.
+- **Headers (Next.js):** `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, CSP (see `next.config.js`).
+
 ## Demo limitations (by design)
 
 | Area | Risk | Notes |
 |------|------|--------|
-| **In-memory auth** | Passwords stored in plaintext in process memory | Replace with a real user store and password hashing (e.g. Argon2). |
-| **Verifier dashboard** | Session is `localStorage`-only | Trivial to forge in devtools; not server-side auth. |
+| **In-memory store** | Data lost on restart; not a real database | Replace with PostgreSQL + Redis for sessions in production. |
+| **Session tokens** | Stored in process memory on the API | Scale-out requires shared session store (Redis). |
 | **TEE quotes** | Mock / demo | Not verifiable against Intel DCAP or Eigen AVS until wired to real infrastructure. |
 | **CORS** | Allowlist via `CORS_ORIGINS` | Defaults to common localhost ports; set explicitly for deployment. |
 | **`/health`** | Does not expose the signer address by default | Set `EXPOSE_SIGNER_ADDRESS=true` only if you intend to publish it. |
+| **Dependencies** | `npm audit` may report issues in Next.js / transitive deps | Review advisories; major version bumps need regression testing. |
 
 ## Environment variables
 

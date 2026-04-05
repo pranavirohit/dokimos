@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const TEE_ENDPOINT = process.env.TEE_ENDPOINT || "http://localhost:8082";
+    const TEE_ENDPOINT = process.env.TEE_ENDPOINT || "http://localhost:8080";
 
     const response = await axios.post(
       `${TEE_ENDPOINT}/api/request-verification`,
