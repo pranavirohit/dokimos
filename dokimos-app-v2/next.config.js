@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // getUserMedia + Strict Mode double-mount can leave a stale rejection that sets "Camera access denied"
+  // while the active stream is fine; camera code uses session guards + deferred setError to mitigate.
   reactStrictMode: true,
   webpack: (config) => {
     config.resolve.fallback = {

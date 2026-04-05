@@ -44,16 +44,17 @@ export function AppShellLayout({
   const sans = "var(--font-instrument-sans), system-ui, sans-serif";
 
   return (
-    <div className="relative mx-auto flex min-h-[100dvh] w-full max-w-lg flex-col bg-white pt-[env(safe-area-inset-top)] shadow-none md:max-h-[min(100dvh,900px)] md:min-h-[min(100dvh,900px)] md:my-4 md:overflow-hidden md:rounded-[32px] md:border md:border-gray-200/80 md:shadow-2xl">
+    <div className="relative flex min-h-[100dvh] w-full flex-col bg-white pt-[env(safe-area-inset-top)]">
       {topBar}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="mx-auto flex min-h-0 w-full max-w-[600px] flex-1 flex-col overflow-hidden lg:max-w-3xl">
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">{children}</div>
-        {!hideTabBar && (
-          <nav
-            className="h-14 shrink-0 border-t border-[#F3F4F6] bg-white pb-[env(safe-area-inset-bottom)] pt-2"
-            aria-label="Main"
-          >
-            <div className="flex h-full items-end justify-around px-1">
+      </div>
+      {!hideTabBar && (
+        <nav
+          className="h-14 w-full shrink-0 border-t border-[#F3F4F6] bg-white pb-[env(safe-area-inset-bottom)] pt-2"
+          aria-label="Main"
+        >
+          <div className="mx-auto flex h-full max-w-[600px] items-end justify-around px-1 lg:max-w-3xl">
               <Link
                 href="/app/vault"
                 aria-current={activeTab === "vault" ? "page" : undefined}
@@ -104,9 +105,8 @@ export function AppShellLayout({
                 <span className="text-[11px] font-normal">Settings</span>
               </Link>
             </div>
-          </nav>
-        )}
-      </div>
+        </nav>
+      )}
     </div>
   );
 }

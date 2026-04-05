@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import {
   useState,
   useEffect,
+  useLayoutEffect,
   useRef,
   useCallback,
   useMemo,
@@ -19,7 +20,6 @@ import {
   XCircle,
   Activity,
   Settings,
-  ChevronDown,
   Clock,
 } from "lucide-react";
 import axios from "axios";
@@ -53,15 +53,14 @@ function DokimosAppShell({
   topBar?: React.ReactNode;
 }) {
   return (
-    <div className="relative mx-auto flex min-h-[100dvh] w-full max-w-lg flex-col bg-[#FAFAF9] pt-[env(safe-area-inset-top)] shadow-none md:max-h-[min(100dvh,900px)] md:min-h-[min(100dvh,900px)] md:my-4 md:overflow-hidden md:rounded-[32px] md:border md:border-gray-200/80 md:shadow-2xl">
+    <div className="relative flex min-h-[100dvh] w-full flex-col bg-[#FAFAF9] pt-[env(safe-area-inset-top)]">
       {topBar}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="mx-auto flex min-h-0 w-full max-w-[600px] flex-1 flex-col overflow-hidden lg:max-w-3xl">
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">{children}</div>
-        {showTabBar && (
-          <nav
-            className="shrink-0 border-t border-gray-200/90 bg-white/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)] pt-1.5"
-          >
-            <div className="flex items-end justify-around px-2">
+      </div>
+      {showTabBar && (
+        <nav className="w-full shrink-0 border-t border-gray-200/90 bg-white/95 pb-[env(safe-area-inset-bottom)] pt-1.5 backdrop-blur-md">
+          <div className="mx-auto flex max-w-[600px] items-end justify-around px-2 lg:max-w-3xl">
               <button
                 type="button"
                 onClick={() => onTabChange("vault")}
@@ -114,8 +113,18 @@ function DokimosAppShell({
                 <span className="text-[11px] font-normal">Settings</span>
               </button>
             </div>
-          </nav>
-        )}
+        </nav>
+      )}
+    </div>
+  );
+}
+
+/** Onboarding steps: full-height scroll, centered column (matches app shell max width). */
+function AppFlowScreenLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-[100dvh] overflow-y-auto bg-[#FAFAF9] pt-[env(safe-area-inset-top)]">
+      <div className="mx-auto flex min-h-[100dvh] w-full max-w-[600px] flex-col px-4 sm:px-6 md:px-8 lg:max-w-3xl">
+        {children}
       </div>
     </div>
   );
@@ -123,7 +132,7 @@ function DokimosAppShell({
 
 export function ShareRequestTopBar({ onBack }: { onBack: () => void }) {
   return (
-    <div className="sticky top-0 z-10 flex shrink-0 items-center gap-3 border-b border-gray-200/80 bg-[#FAFAF9]/95 px-4 py-3 backdrop-blur-md">
+    <div className="sticky top-0 z-10 flex shrink-0 items-center gap-3 border-b border-gray-200/80 bg-[#FAFAF9]/95 px-4 py-3 backdrop-blur-md sm:px-5">
       <button
         type="button"
         onClick={onBack}
@@ -155,7 +164,7 @@ const ScrollingPills = ({ dark = false }: { dark?: boolean }) => {
   const row = [...pills, ...pills, ...pills];
 
   return (
-    <div className="w-full overflow-hidden px-6">
+    <div className="w-full overflow-hidden">
       <div className="dokimos-pills-track flex gap-2">
         {row.map((pill, idx) => (
           <div
@@ -179,18 +188,20 @@ const ScrollingPills = ({ dark = false }: { dark?: boolean }) => {
 // (hydration / edge cases), the whole layer stays invisible and only the gray page bg shows.
 export function Screen01A() {
   return (
-    <div className="relative min-h-[100dvh] w-full bg-[#0F1B4C]">
-      <motion.h1
-        initial={{ opacity: 1 }}
-        animate={{ opacity: 1 }}
-        className="absolute top-[300px] left-6 right-6 text-[64px] font-bold text-white text-center leading-[1.1]"
-        style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}
-      >
-        Again?
-      </motion.h1>
+    <div className="min-h-[100dvh] overflow-y-auto bg-[#0F1B4C]">
+      <div className="mx-auto flex min-h-[100dvh] w-full max-w-[1200px] flex-col justify-center px-4 py-12 sm:px-6 sm:py-16 md:px-8 md:py-20">
+        <motion.h1
+          initial={{ opacity: 1 }}
+          animate={{ opacity: 1 }}
+          className="text-center text-4xl font-bold leading-[1.1] text-white sm:text-5xl md:text-6xl lg:text-7xl"
+          style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}
+        >
+          Again?
+        </motion.h1>
 
-      <div className="absolute top-[415.5px] left-0 w-full">
-        <ScrollingPills dark />
+        <div className="mt-12 w-full sm:mt-16 md:mt-20">
+          <ScrollingPills dark />
+        </div>
       </div>
     </div>
   );
@@ -199,18 +210,20 @@ export function Screen01A() {
 // Screen 01B - Transition State
 export function Screen01B() {
   return (
-    <div className="relative min-h-[100dvh] w-full bg-white">
-      <motion.h1
-        initial={{ opacity: 1 }}
-        animate={{ opacity: 1 }}
-        className="absolute top-[300px] left-6 right-6 text-[64px] font-bold text-gray-900 text-center leading-[1.1]"
-        style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}
-      >
-        Meet Dokimos.
-      </motion.h1>
+    <div className="min-h-[100dvh] overflow-y-auto bg-white">
+      <div className="mx-auto flex min-h-[100dvh] w-full max-w-[1200px] flex-col justify-center px-4 py-12 sm:px-6 sm:py-16 md:px-8 md:py-20">
+        <motion.h1
+          initial={{ opacity: 1 }}
+          animate={{ opacity: 1 }}
+          className="text-center text-4xl font-bold leading-[1.1] text-gray-900 sm:text-5xl md:text-6xl lg:text-7xl"
+          style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}
+        >
+          Meet Dokimos.
+        </motion.h1>
 
-      <div className="absolute top-[415.5px] left-0 w-full">
-        <ScrollingPills />
+        <div className="mt-12 w-full sm:mt-16 md:mt-20">
+          <ScrollingPills />
+        </div>
       </div>
     </div>
   );
@@ -223,44 +236,50 @@ export function Screen01C({ onNext }: { onNext: () => void }) {
   };
 
   return (
-    <div className="relative min-h-[100dvh] w-full bg-white">
-      <motion.h2
-        initial={{ opacity: 1 }}
-        animate={{ opacity: 1 }}
-        className="absolute top-[260px] left-6 right-6 text-[40px] font-bold text-gray-900 text-center leading-[1.15]"
-        style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}
-      >
-        The last time you'll ever<br />need to upload your ID.
-      </motion.h2>
+    <div className="flex min-h-[100dvh] flex-col overflow-y-auto bg-white">
+      <div className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col px-4 py-10 sm:px-6 sm:py-12 md:px-8 md:py-16">
+        <motion.h2
+          initial={{ opacity: 1 }}
+          animate={{ opacity: 1 }}
+          className="text-center text-3xl font-bold leading-[1.15] text-gray-900 sm:text-4xl md:text-5xl"
+          style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}
+        >
+          The last time you&apos;ll ever<br />
+          need to upload your ID.
+        </motion.h2>
 
-      <div className="absolute top-[415.5px] left-0 w-full">
-        <ScrollingPills />
+        <div className="mt-10 w-full sm:mt-12 md:mt-16">
+          <ScrollingPills />
+        </div>
       </div>
 
       <motion.div
         initial={{ y: 24 }}
         animate={{ y: 0 }}
         transition={{ delay: 0.35, duration: 0.45 }}
-        className="absolute bottom-0 left-0 right-0 bg-[#0F1B4C] rounded-t-[24px] px-6 py-10 flex flex-col gap-4"
+        className="mx-auto mt-auto w-full max-w-[1200px] rounded-t-[24px] bg-[#0F1B4C] px-4 py-8 sm:px-6 sm:py-10 md:px-8"
       >
-        <h3 className="text-[22px] font-bold text-white text-center mb-2">
-          Get started with Dokimos
-        </h3>
-        <button
-          onClick={handleGoogleSignIn}
-          className="w-full h-14 bg-white rounded-xl text-gray-900 text-[16px] font-semibold hover:bg-gray-100 transition-colors flex items-center justify-center gap-3"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-          </svg>
-          Continue with Google
-        </button>
-        <p className="text-xs text-white/60 text-center px-4">
-          By continuing, you agree to our Terms of Service and Privacy Policy
-        </p>
+        <div className="mx-auto flex max-w-[600px] flex-col gap-4">
+          <h3 className="mb-2 text-center text-xl font-bold text-white sm:text-[22px]">
+            Get started with Dokimos
+          </h3>
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            className="flex h-12 min-h-[44px] w-full items-center justify-center gap-3 rounded-xl bg-white text-[15px] font-semibold text-gray-900 transition-colors hover:bg-gray-100 sm:h-14 sm:text-[16px]"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+            </svg>
+            Continue with Google
+          </button>
+          <p className="px-2 text-center text-xs text-white/60">
+            By continuing, you agree to our Terms of Service and Privacy Policy
+          </p>
+        </div>
       </motion.div>
     </div>
   );
@@ -352,30 +371,39 @@ export function Screen02Upload({
   };
 
   return (
-    <div className="relative flex min-h-[100dvh] w-full flex-col bg-[#FAFAF9] pt-[env(safe-area-inset-top)]">
+    <AppFlowScreenLayout>
       {/* Top Navigation */}
-      <div className="flex h-[52px] shrink-0 items-center px-6">
-        <button onClick={onBack}>
+      <div className="flex h-11 shrink-0 items-center sm:h-[52px]">
+        <button type="button" onClick={onBack} className="-ml-1 rounded-lg p-1 hover:bg-gray-200/60" aria-label="Back">
           <ArrowLeft size={24} className="text-gray-900" />
         </button>
       </div>
 
       {/* Headline Section */}
-      <div className="mt-8 px-6">
-        <h1 className="text-[36px] font-bold text-gray-900 leading-[1.15]" style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}>
+      <div className="mt-6 sm:mt-8">
+        <h1
+          className="text-3xl font-bold leading-[1.15] text-gray-900 sm:text-4xl md:text-[36px]"
+          style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}
+        >
           One last upload. Ever.
         </h1>
-        <p className="text-[15px] text-gray-500 mt-3 leading-[1.5]" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
+        <p
+          className="mt-3 text-sm leading-[1.5] text-gray-500 sm:text-[15px]"
+          style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+        >
           Take a photo or upload an image of any government ID.
         </p>
-        <p className="text-[12px] text-gray-500 mt-2 leading-[1.5]" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
+        <p
+          className="mt-2 text-xs leading-[1.5] text-gray-500 sm:text-[12px]"
+          style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+        >
           Your ID is processed in protected hardware and immediately deleted. Not even Dokimos can see it.
         </p>
       </div>
 
       {/* Error message */}
       {error && (
-        <div className="px-6 mt-2">
+        <div className="mt-2">
           <p className="text-[13px] text-red-600" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
             {error}
           </p>
@@ -383,7 +411,7 @@ export function Screen02Upload({
       )}
 
       {/* Upload Zone - fills remaining space */}
-      <div className="flex-1 px-6 mt-6 mb-6">
+      <div className="mb-6 mt-4 flex-1 sm:mt-6">
         <input
           ref={fileInputRef}
           type="file"
@@ -398,14 +426,13 @@ export function Screen02Upload({
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`relative w-full h-full rounded-2xl border-[1.5px] transition-all ${
+          className={`relative h-full w-full min-h-[280px] rounded-2xl border-[1.5px] transition-all sm:min-h-[320px] ${
             uploadState === "selected"
               ? "border-emerald-600 bg-[#F0FDF4]"
               : isDragging
-              ? "border-[#4F46E5] border-solid bg-[#EEF2FF]"
-              : "border-dashed border-gray-200 bg-white"
+                ? "border-[#4F46E5] border-solid bg-[#EEF2FF]"
+                : "border-dashed border-gray-200 bg-white"
           }`}
-          style={{ minHeight: "320px" }}
         >
           {/* Default State */}
           {uploadState === "default" && !isDragging && (
@@ -427,7 +454,7 @@ export function Screen02Upload({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex h-12 w-full max-w-[340px] items-center justify-center gap-2 rounded-xl bg-[#4F46E5] px-4 text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-[#4338CA] active:bg-[#3730A3]"
+                className="flex h-11 min-h-[44px] w-full max-w-[340px] items-center justify-center gap-2 rounded-xl bg-[#4F46E5] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#4338CA] active:bg-[#3730A3] sm:h-12 sm:text-[15px]"
                 style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
                 aria-label="Add government ID from camera or photo library"
               >
@@ -490,295 +517,342 @@ export function Screen02Upload({
       </div>
 
       {/* Fixed Footer Bar */}
-      <div className="bg-white border-t border-gray-100 px-6 pt-5 pb-8">
+      <div className="-mx-4 mt-auto border-t border-gray-100 bg-white px-4 pb-8 pt-5 sm:-mx-6 sm:px-6 md:-mx-8 md:px-8">
         <button
           type="button"
           onClick={handleContinue}
           disabled={uploadState === "default"}
-          className={`w-full h-14 rounded-xl text-[15px] font-medium transition-colors ${
+          className={`h-12 min-h-[44px] w-full rounded-xl text-sm font-medium transition-colors sm:h-14 sm:text-[15px] ${
             uploadState === "selected"
               ? "bg-[#4F46E5] text-white hover:bg-[#4338CA]"
-              : "bg-gray-200 text-gray-400 cursor-not-allowed"
+              : "cursor-not-allowed bg-gray-200 text-gray-400"
           }`}
           style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
         >
           Continue
         </button>
       </div>
-    </div>
+    </AppFlowScreenLayout>
   );
 }
 
-// Screen 02B - Liveness Check
+// Screen 02B — Selfie capture (TEE performs face match from livePhotoBase64)
 export function Screen02BLiveness({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [livenessState, setLivenessState] = useState<"ready" | "detecting" | "processing" | "error">("ready");
-  const [faceDetected, setFaceDetected] = useState(false);
-  const [modelsLoaded, setModelsLoaded] = useState(false);
-  const [stream, setStream] = useState<MediaStream | null>(null);
-  const detectionIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  /** Increments only in effect cleanup. In-flight getUserMedia from a previous mount compares against this so Strict Mode / double-mount does not set error or drop the winning stream incorrectly. */
+  const cameraSessionRef = useRef(0);
+  const [cameraStatus, setCameraStatus] = useState<"starting" | "preview" | "error" | "processing">("starting");
 
-  useEffect(() => {
-    // Load face-api models
-    const loadModels = async () => {
+  /** Stop all tracks and detach the video element — otherwise many browsers keep the camera LED on. */
+  const releaseCamera = useCallback(() => {
+    const video = videoRef.current;
+    if (video) {
+      video.srcObject = null;
       try {
-        const faceapi = (await import('face-api.js')).default;
-        await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
-        setModelsLoaded(true);
-      } catch (err) {
-        console.error("Failed to load face detection models:", err);
-      }
-    };
-    loadModels();
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (detectionIntervalRef.current) {
-        clearInterval(detectionIntervalRef.current);
-      }
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-    };
-  }, [stream]);
-
-  const handleStartCapture = async () => {
-    if (!modelsLoaded) {
-      console.error("Models not loaded yet");
-      return;
-    }
-
-    try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          facingMode: 'user',
-          width: { ideal: 640 },
-          height: { ideal: 480 }
-        } 
-      });
-      
-      setStream(mediaStream);
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        videoRef.current.play();
-      }
-      
-      setLivenessState("detecting");
-      
-      // Start face detection after video is ready
-      setTimeout(() => {
-        startFaceDetection();
-      }, 500);
-    } catch (err) {
-      console.error("Camera access denied:", err);
-      setLivenessState("error");
-    }
-  };
-
-  const startFaceDetection = async () => {
-    const faceapi = (await import('face-api.js')).default;
-    
-    const detectFace = async () => {
-      if (!videoRef.current || livenessState !== "detecting") return;
-      
-      try {
-        const detection = await faceapi.detectSingleFace(
-          videoRef.current,
-          new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })
-        );
-
-        if (detection && detection.score > 0.6) {
-          setFaceDetected(true);
-          if (detectionIntervalRef.current) {
-            clearInterval(detectionIntervalRef.current);
-          }
-        }
-      } catch (err) {
-        console.error("Face detection error:", err);
-      }
-    };
-
-    // Check for face every 100ms
-    detectionIntervalRef.current = setInterval(detectFace, 100);
-  };
-
-  const handleVerifyFace = () => {
-    if (videoRef.current && stream) {
-      const video = videoRef.current;
-      const c = document.createElement("canvas");
-      c.width = video.videoWidth;
-      c.height = video.videoHeight;
-      const ctx = c.getContext("2d");
-      ctx?.drawImage(video, 0, 0);
-      const dataUrl = c.toDataURL("image/jpeg", 0.92);
-      try {
-        localStorage.setItem(STORAGE_LIVE_PHOTO, dataUrl);
+        video.load();
       } catch {
         /* ignore */
       }
     }
-    stream?.getTracks().forEach((track) => track.stop());
-    if (detectionIntervalRef.current) {
-      clearInterval(detectionIntervalRef.current);
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const sessionAtMount = cameraSessionRef.current;
+
+    const startCamera = async () => {
+      const logCtx = { sessionAtMount, sessionNow: () => cameraSessionRef.current };
+      if (!navigator.mediaDevices?.getUserMedia) {
+        console.error("[Dokimos selfie] getUserMedia not available", logCtx);
+        queueMicrotask(() => {
+          if (sessionAtMount !== cameraSessionRef.current) return;
+          setCameraStatus("error");
+        });
+        return;
+      }
+
+      console.log("[Dokimos selfie] getUserMedia requested", logCtx);
+      try {
+        const mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "user",
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+          },
+        });
+        console.log("[Dokimos selfie] getUserMedia success", {
+          ...logCtx,
+          trackCount: mediaStream.getTracks().length,
+          trackLabels: mediaStream.getVideoTracks().map((t) => t.label),
+        });
+
+        if (cancelled || sessionAtMount !== cameraSessionRef.current) {
+          console.log("[Dokimos selfie] discarding stream (stale session)", {
+            sessionAtMount,
+            current: cameraSessionRef.current,
+            cancelled,
+          });
+          mediaStream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        streamRef.current = mediaStream;
+        setCameraStatus("preview");
+        console.log("[Dokimos selfie] cameraStatus -> preview", {
+          videoRefExists: Boolean(videoRef.current),
+        });
+      } catch (err) {
+        const e = err as DOMException & { name?: string };
+        console.error("[Dokimos selfie] getUserMedia error", {
+          ...logCtx,
+          name: e?.name,
+          message: e?.message,
+          err,
+        });
+        const failedSession = sessionAtMount;
+        queueMicrotask(() => {
+          if (cancelled) {
+            console.log("[Dokimos selfie] ignoring error (effect cancelled)");
+            return;
+          }
+          if (failedSession !== cameraSessionRef.current) {
+            console.log("[Dokimos selfie] ignoring error (stale session after Strict Mode cleanup)", {
+              failedSession,
+              current: cameraSessionRef.current,
+            });
+            return;
+          }
+          if (streamRef.current) {
+            console.log("[Dokimos selfie] ignoring error (stream already active)");
+            return;
+          }
+          console.warn("[Dokimos selfie] cameraStatus -> error");
+          setCameraStatus("error");
+        });
+      }
+    };
+
+    void startCamera();
+
+    return () => {
+      cancelled = true;
+      cameraSessionRef.current += 1;
+      console.log("[Dokimos selfie] cleanup: stop tracks, bump session", {
+        newSession: cameraSessionRef.current,
+      });
+      releaseCamera();
+    };
+  }, [releaseCamera]);
+
+  useLayoutEffect(() => {
+    const video = videoRef.current;
+    const stream = streamRef.current;
+    if (!video || !stream || cameraStatus !== "preview") {
+      console.log("[Dokimos selfie] skip video bind", {
+        cameraStatus,
+        hasVideo: Boolean(video),
+        hasStream: Boolean(stream),
+      });
+      return;
     }
-    setLivenessState("processing");
+    video.srcObject = stream;
+    void video.play().then(
+      () =>
+        console.log("[Dokimos selfie] video.play() ok", {
+          videoWidth: video.videoWidth,
+          videoHeight: video.videoHeight,
+        }),
+      (playErr) =>
+        console.error("[Dokimos selfie] video.play() failed", playErr)
+    );
+  }, [cameraStatus]);
+
+  useEffect(() => {
+    if (cameraStatus === "error") {
+      console.warn("[Dokimos selfie] UI shows Camera access denied", {
+        session: cameraSessionRef.current,
+        hasStreamRef: Boolean(streamRef.current),
+      });
+    }
+  }, [cameraStatus]);
+
+  const handleCapturePhoto = () => {
+    const video = videoRef.current;
+    const stream = streamRef.current;
+    if (!video || !stream || cameraStatus !== "preview") return;
+    if (video.videoWidth === 0 || video.videoHeight === 0) return;
+
+    const c = canvasRef.current ?? document.createElement("canvas");
+    c.width = video.videoWidth;
+    c.height = video.videoHeight;
+    const ctx = c.getContext("2d");
+    ctx?.drawImage(video, 0, 0);
+    const dataUrl = c.toDataURL("image/jpeg", 0.92);
+    try {
+      localStorage.setItem(STORAGE_LIVE_PHOTO, dataUrl);
+    } catch {
+      /* ignore */
+    }
+    releaseCamera();
+    setCameraStatus("processing");
     setTimeout(() => {
       onNext();
     }, 500);
   };
 
   return (
-    <div className="relative flex min-h-[100dvh] w-full flex-col bg-[#FAFAF9] pt-[env(safe-area-inset-top)]">
-      {/* Top Navigation */}
-      <div className="flex h-[52px] shrink-0 items-center px-6">
-        <button onClick={onBack}>
+    <AppFlowScreenLayout>
+      <div className="flex h-11 shrink-0 items-center sm:h-[52px]">
+        <button type="button" onClick={onBack} className="-ml-1 rounded-lg p-1 hover:bg-gray-200/60" aria-label="Back">
           <ArrowLeft size={24} className="text-gray-900" />
         </button>
       </div>
 
-      {/* Headline Section */}
-      <div className="mt-8 px-6">
-        <h1 className="text-[36px] font-bold text-gray-900 leading-[1.15]" style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}>
-          Making sure it's you.
+      <div className="mt-6 sm:mt-8">
+        <h1
+          className="text-3xl font-bold leading-[1.15] text-gray-900 sm:text-4xl md:text-[36px]"
+          style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}
+        >
+          Making sure it&apos;s you.
         </h1>
-        <p className="text-[15px] text-gray-500 mt-3 leading-[1.5]" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
-          Take a quick selfie to confirm you're the person on this ID.
+        <p
+          className="mt-3 text-sm leading-[1.5] text-gray-500 sm:text-[15px]"
+          style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+        >
+          Take a quick selfie to confirm you&apos;re the person on this ID.
         </p>
-        <p className="text-[12px] text-gray-500 mt-2 leading-[1.5]" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
+        <p
+          className="mt-2 text-xs leading-[1.5] text-gray-500 sm:text-[12px]"
+          style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+        >
           Your selfie is processed in protected hardware and immediately deleted. Not even Dokimos can see it.
         </p>
       </div>
 
-      {/* Camera Preview Zone */}
-      <div className="flex-1 px-6 mt-6 mb-6">
-        <button
-          onClick={livenessState === "ready" ? handleStartCapture : undefined}
-          disabled={livenessState === "processing"}
-          className={`relative w-full h-full rounded-2xl border-[1.5px] transition-all overflow-hidden ${
-            livenessState === "processing"
+      <div className="mb-6 mt-4 flex-1 sm:mt-6">
+        <div
+          className={`relative w-full overflow-hidden rounded-2xl border-[1.5px] transition-all sm:min-h-[320px] ${
+            cameraStatus === "processing"
               ? "border-emerald-600 bg-[#F0FDF4]"
-              : faceDetected
-              ? "border-emerald-600 bg-[#F0FDF4]"
-              : livenessState === "detecting"
-              ? "border-[#4F46E5] bg-gray-900"
-              : "border-dashed border-gray-200 bg-gray-900 cursor-pointer hover:border-gray-300"
+              : cameraStatus === "error"
+                ? "border-red-200 bg-gray-900"
+                : cameraStatus === "preview"
+                  ? "border-[#4F46E5] bg-gray-900"
+                  : "border-dashed border-gray-200 bg-gray-900"
           }`}
-          style={{ minHeight: "320px" }}
+          style={{ minHeight: "min(280px, 50vh)" }}
         >
-          {/* Video element (hidden but active during detection) */}
           <video
             ref={videoRef}
-            className={`absolute inset-0 w-full h-full object-cover ${livenessState === "detecting" ? "block" : "hidden"}`}
+            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-150 ${
+              cameraStatus === "preview" || cameraStatus === "processing"
+                ? "z-0 opacity-100"
+                : "z-0 opacity-0"
+            }`}
             autoPlay
             playsInline
             muted
           />
           <canvas ref={canvasRef} className="hidden" />
 
-          {/* Ready State - Tap to start camera */}
-          {livenessState === "ready" && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <div className="w-32 h-40 rounded-full border-[1.5px] border-gray-400 border-dashed mb-5" />
-              <p className="text-[16px] font-medium text-white mb-2" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
-                Tap to start camera
-              </p>
-              <p className="text-[13px] text-gray-400" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
-                Position your face in the oval
+          {cameraStatus === "starting" && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center px-4">
+              <p
+                className="text-center text-[16px] font-medium text-white"
+                style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+              >
+                Starting camera…
               </p>
             </div>
           )}
 
-          {/* Detecting State - Camera active with face detection overlay */}
-          {livenessState === "detecting" && !faceDetected && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <div className="w-48 h-56 rounded-full border-2 border-[#4F46E5] mb-5 animate-pulse" />
-              <p className="text-[15px] font-medium text-white bg-black/50 px-4 py-2 rounded-lg" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
-                Detecting face...
-              </p>
+          {cameraStatus === "preview" && (
+            <div
+              className="pointer-events-none absolute inset-0 flex items-center justify-center"
+              aria-hidden
+            >
+              <div className="h-52 w-40 rounded-full border-2 border-dashed border-white/40" />
             </div>
           )}
 
-          {/* Face Detected State */}
-          {faceDetected && livenessState === "detecting" && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <div className="w-48 h-56 rounded-full border-2 border-emerald-600" />
-              <div className="absolute w-12 h-12 rounded-full bg-emerald-600 flex items-center justify-center">
-                <Check size={24} className="text-white" />
-              </div>
-              <p className="text-[15px] font-medium text-white bg-emerald-600/90 px-4 py-2 rounded-lg mt-5" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
-                Face detected
-              </p>
-            </div>
-          )}
-
-          {/* Error State */}
-          {livenessState === "error" && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
+          {cameraStatus === "error" && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center px-4">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
                 <XCircle size={32} className="text-red-600" />
               </div>
-              <p className="text-[16px] font-medium text-white mb-2" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
+              <p
+                className="mb-2 text-[16px] font-medium text-white"
+                style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+              >
                 Camera access denied
               </p>
-              <p className="text-[13px] text-gray-400 text-center px-8" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
+              <p
+                className="max-w-[280px] text-center text-[13px] text-gray-400"
+                style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+              >
                 Please enable camera permissions and try again
               </p>
             </div>
           )}
 
-          {/* Processing State */}
-          {livenessState === "processing" && (
+          {cameraStatus === "processing" && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0F1B4C] bg-opacity-90">
-              <p className="text-[15px] font-medium text-white mb-3" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
-                Matching face to ID...
+              <p
+                className="mb-3 text-[15px] font-medium text-white"
+                style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+              >
+                Continuing…
               </p>
               <div className="flex items-center gap-1.5">
                 <motion.div
-                  className="w-1.5 h-1.5 bg-[#4F46E5] rounded-full"
+                  className="h-1.5 w-1.5 rounded-full bg-[#4F46E5]"
                   animate={{ scale: [1, 1.3, 1] }}
                   transition={{ duration: 1, repeat: Infinity, delay: 0 }}
                 />
                 <motion.div
-                  className="w-2 h-2 bg-[#4F46E5] rounded-full"
+                  className="h-2 w-2 rounded-full bg-[#4F46E5]"
                   animate={{ scale: [1, 1.3, 1] }}
                   transition={{ duration: 1, repeat: Infinity, delay: 0.2 }}
                 />
                 <motion.div
-                  className="w-1.5 h-1.5 bg-[#4F46E5] rounded-full"
+                  className="h-1.5 w-1.5 rounded-full bg-[#4F46E5]"
                   animate={{ scale: [1, 1.3, 1] }}
                   transition={{ duration: 1, repeat: Infinity, delay: 0.4 }}
                 />
               </div>
             </div>
           )}
-        </button>
+        </div>
       </div>
 
-      {/* Fixed Footer Bar */}
-      <div className="bg-white border-t border-gray-100 px-6 pt-5 pb-8">
-        {livenessState === "processing" ? (
-          <p className="text-[12px] text-gray-500 text-center" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
+      <div className="-mx-4 mt-auto border-t border-gray-100 bg-white px-4 pb-8 pt-5 sm:-mx-6 sm:px-6 md:-mx-8 md:px-8">
+        {cameraStatus === "processing" ? (
+          <p
+            className="text-center text-xs text-gray-500 sm:text-[12px]"
+            style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+          >
             This takes about 10 seconds
           </p>
         ) : (
           <button
-            onClick={handleVerifyFace}
-            disabled={!faceDetected}
-            className={`w-full h-14 rounded-xl text-[15px] font-medium transition-colors ${
-              faceDetected
+            type="button"
+            onClick={handleCapturePhoto}
+            disabled={cameraStatus !== "preview"}
+            className={`h-12 min-h-[44px] w-full rounded-xl text-sm font-medium transition-colors sm:h-14 sm:text-[15px] ${
+              cameraStatus === "preview"
                 ? "bg-[#4F46E5] text-white hover:bg-[#4338CA]"
-                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                : "cursor-not-allowed bg-gray-200 text-gray-400"
             }`}
             style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
           >
-            Verify Face Match
+            Capture Photo
           </button>
         )}
       </div>
-    </div>
+    </AppFlowScreenLayout>
   );
 }
 
@@ -846,17 +920,17 @@ export function Screen02VerifyProcessing({
   }, [onSuccess, setAttestationData]);
 
   return (
-    <div className="relative flex min-h-[100dvh] w-full flex-col bg-[#FAFAF9] pt-[env(safe-area-inset-top)]">
-      <div className="flex h-[52px] shrink-0 items-center px-6">
-        <button type="button" onClick={onBack}>
+    <AppFlowScreenLayout>
+      <div className="flex h-11 shrink-0 items-center sm:h-[52px]">
+        <button type="button" onClick={onBack} className="-ml-1 rounded-lg p-1 hover:bg-gray-200/60" aria-label="Back">
           <ArrowLeft size={24} className="text-gray-900" />
         </button>
       </div>
-      <div className="flex flex-1 flex-col items-center justify-center px-6 pb-24">
+      <div className="flex min-h-[60vh] flex-1 flex-col items-center justify-center px-0 py-12 pb-16 sm:min-h-0 sm:py-16 sm:pb-24">
         {error ? (
           <>
             <p
-              className="text-center text-[15px] text-red-600"
+              className="text-center text-sm text-red-600 sm:text-[15px]"
               style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
             >
               {error}
@@ -864,7 +938,7 @@ export function Screen02VerifyProcessing({
             <button
               type="button"
               onClick={onBack}
-              className="mt-6 h-12 rounded-xl bg-[#4F46E5] px-8 text-[15px] font-medium text-white"
+              className="mt-6 h-12 min-h-[44px] rounded-xl bg-[#4F46E5] px-8 text-sm font-medium text-white sm:text-[15px]"
               style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
             >
               Go back
@@ -873,12 +947,12 @@ export function Screen02VerifyProcessing({
         ) : (
           <>
             <p
-              className="text-[15px] font-medium text-gray-900"
+              className="text-sm font-medium text-gray-900 sm:text-[15px]"
               style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
             >
               Verifying in TEE…
             </p>
-            <p className="mt-2 text-center text-[13px] text-gray-500">
+            <p className="mt-2 max-w-md text-center text-xs text-gray-500 sm:text-[13px]">
               OCR, face match, and signing — this can take up to a minute.
             </p>
             <div className="mt-8 flex items-center gap-1.5">
@@ -901,7 +975,7 @@ export function Screen02VerifyProcessing({
           </>
         )}
       </div>
-    </div>
+    </AppFlowScreenLayout>
   );
 }
 
@@ -981,7 +1055,6 @@ export function Screen03Vault({
 
   const [pendingRequests, setPendingRequests] = useState<VerificationRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(true);
-  const [proofOpen, setProofOpen] = useState(false);
   const [hasEncryptedId, setHasEncryptedId] = useState(false);
   const [reVerifyLoading, setReVerifyLoading] = useState(false);
   const [reVerifyError, setReVerifyError] = useState<string | null>(null);
@@ -1015,11 +1088,6 @@ export function Screen03Vault({
   const verificationUrl =
     attestationData?.eigen?.verificationUrl ??
     getEigenVerificationDashboardUrl(attestationData?.eigen?.appId);
-
-  const truncateMid = (s: string, left = 8, right = 6) => {
-    if (s.length <= left + right + 3) return s;
-    return `${s.slice(0, left)}…${s.slice(-right)}`;
-  };
 
   const fetchPending = useCallback(async () => {
     try {
@@ -1096,7 +1164,7 @@ export function Screen03Vault({
 
   return (
     <div className="relative w-full">
-      <div className="relative flex h-[52px] shrink-0 items-center justify-between gap-2 px-5">
+      <div className="relative flex h-11 shrink-0 items-center justify-between gap-2 px-4 sm:h-[52px] sm:px-5 md:px-6">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           {showHeaderBack ? (
             <>
@@ -1128,8 +1196,8 @@ export function Screen03Vault({
         <VaultInfoMenu verificationUrl={verificationUrl} />
       </div>
 
-      <div className="space-y-10 px-5 pb-10 pt-2">
-        <section className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm shadow-slate-900/[0.04]">
+      <div className="space-y-8 px-4 pb-8 pt-2 sm:space-y-10 sm:px-5 sm:pb-10 md:px-6">
+        <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-900/[0.04] sm:p-6">
           <div className="flex min-w-0 gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-600 shadow-sm">
               <Check size={20} className="text-white" strokeWidth={2.5} />
@@ -1184,7 +1252,7 @@ export function Screen03Vault({
 
           <div className="mt-7 border-t border-slate-100 pt-7">
             <h2
-              className="text-[28px] font-semibold tracking-tight text-slate-900 sm:text-[30px]"
+              className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-[28px] md:text-[30px]"
               style={{ fontFamily: serif }}
             >
               Your Identity Vault
@@ -1281,7 +1349,7 @@ export function Screen03Vault({
                 type="button"
                 onClick={handleReVerify}
                 disabled={reVerifyLoading}
-                className="mt-4 h-11 w-full rounded-xl border border-emerald-700/30 bg-white text-[14px] font-semibold text-emerald-900 shadow-sm transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-4 h-12 min-h-[44px] w-full rounded-xl border border-emerald-700/30 bg-white text-[14px] font-semibold text-emerald-900 shadow-sm transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
                 style={{ fontFamily: sans }}
               >
                 {reVerifyLoading ? "Re-verifying…" : "Re-verify identity"}
@@ -1368,61 +1436,6 @@ export function Screen03Vault({
             </Link>
           )}
         </section>
-
-        {attestationData && (
-          <section className="rounded-xl border border-slate-200 bg-white shadow-sm shadow-slate-900/[0.03]">
-            <button
-              type="button"
-              id="cryptographic-proof"
-              onClick={() => setProofOpen((o) => !o)}
-              className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
-              aria-expanded={proofOpen}
-            >
-              <span
-                className="text-[15px] font-semibold text-slate-900"
-                style={{ fontFamily: sans }}
-              >
-                Cryptographic proof
-              </span>
-              <ChevronDown
-                className={`h-5 w-5 shrink-0 text-slate-400 transition-transform ${proofOpen ? "rotate-180" : ""}`}
-                aria-hidden
-              />
-            </button>
-            {proofOpen && (
-              <div className="space-y-4 border-t border-slate-100 px-5 pb-5 pt-4">
-                <p className="text-[13px] leading-relaxed text-slate-600" style={{ fontFamily: sans }}>
-                  Independent verification for auditors and partners. This does not expose your raw ID
-                  data.
-                </p>
-                <dl className="space-y-3 text-[12px]">
-                  <div>
-                    <dt className="font-medium text-slate-500">Message hash</dt>
-                    <dd className="mt-0.5 font-mono text-[11px] text-slate-800 break-all">
-                      {truncateMid(attestationData.messageHash)}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="font-medium text-slate-500">Signature</dt>
-                    <dd className="mt-0.5 font-mono text-[11px] text-slate-800 break-all">
-                      {truncateMid(attestationData.signature, 10, 8)}
-                    </dd>
-                  </div>
-                </dl>
-                <a
-                  href={verificationUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-emerald-800 hover:text-emerald-900"
-                  style={{ fontFamily: sans }}
-                >
-                  Open verification dashboard
-                  <ExternalLink size={14} className="opacity-80" aria-hidden />
-                </a>
-              </div>
-            )}
-          </section>
-        )}
       </div>
     </div>
   );
@@ -1555,7 +1568,7 @@ export function Screen04Share({
   const wfLabel = workflowDisplayName(selectedRequest?.workflow);
 
   return (
-    <div className="relative w-full px-5 pb-8 pt-4">
+    <div className="relative w-full px-4 pb-8 pt-4 sm:px-5 md:px-6 md:pb-10">
       <input
         ref={reviewFileRef}
         type="file"
@@ -1565,7 +1578,7 @@ export function Screen04Share({
         onChange={onReviewPickFile}
         aria-hidden
       />
-      <div className="mx-auto w-full max-w-md rounded-[28px] border border-gray-100/90 bg-white p-6 shadow-[0_4px_24px_rgba(15,23,42,0.06)]">
+      <div className="mx-auto w-full max-w-[600px] rounded-[28px] border border-gray-100/90 bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,0.06)] sm:p-6">
         {/* Company header with trust badge */}
         <div className="mb-3 flex items-start gap-3">
           <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium flex-shrink-0">
@@ -1573,7 +1586,10 @@ export function Screen04Share({
           </div>
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
-              <p className="text-[28px] font-bold text-gray-900 leading-tight" style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}>
+              <p
+                className="text-xl font-bold leading-tight text-gray-900 sm:text-2xl md:text-[28px]"
+                style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}
+              >
                 {companyName}
               </p>
               <div className="px-2 py-0.5 bg-blue-50 border border-blue-200 rounded text-[10px] font-medium text-blue-700">
@@ -1652,7 +1668,7 @@ export function Screen04Share({
         <button
           onClick={handleApprove}
           disabled={submitting || !storedImageData}
-          className="w-full h-14 bg-[#4F46E5] rounded-xl text-white text-[15px] font-semibold mt-2 flex items-center justify-center gap-2 hover:bg-[#4338CA] transition-colors disabled:opacity-50"
+          className="mt-2 flex h-12 min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-[#4F46E5] text-sm font-semibold text-white transition-colors hover:bg-[#4338CA] disabled:opacity-50 sm:h-14 sm:text-[15px]"
           style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
         >
           <Shield size={16} className="text-white" />
@@ -1662,7 +1678,7 @@ export function Screen04Share({
         <button 
           onClick={handleDeny}
           disabled={submitting}
-          className="mt-3 h-14 w-full rounded-xl border border-gray-200 bg-white text-[15px] font-semibold text-[#EF4444] transition-colors hover:bg-gray-50 disabled:opacity-50"
+          className="mt-3 h-12 min-h-[44px] w-full rounded-xl border border-gray-200 bg-white text-sm font-semibold text-[#EF4444] transition-colors hover:bg-gray-50 disabled:opacity-50 sm:h-14 sm:text-[15px]"
           style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
         >
           {submitting ? "Processing..." : "Deny"}
@@ -1703,7 +1719,7 @@ export function Screen05Receipt({
 
   return (
     <div className="relative w-full">
-      <div className="px-5 pb-8 pt-6">
+      <div className="mx-auto max-w-[600px] px-4 pb-8 pt-6 sm:px-5 md:px-6 md:pb-10">
         <h1
           className="text-center text-[17px] font-bold text-[#0F1B4C]"
           style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
@@ -1711,18 +1727,24 @@ export function Screen05Receipt({
           Dokimos
         </h1>
 
-      <div className="mt-8 flex flex-col items-center px-1 pb-4">
+      <div className="mt-6 flex flex-col items-center px-0 pb-4 sm:mt-8">
         <div className="w-20 h-20 rounded-full bg-emerald-600 flex items-center justify-center mb-5">
           <Check size={40} className="text-white" />
         </div>
 
-        <h2 className="text-[56px] font-bold text-emerald-600 mb-4" style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}>
+        <h2
+          className="mb-4 text-4xl font-bold text-emerald-600 sm:text-5xl md:text-[56px]"
+          style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}
+        >
           Verified
         </h2>
 
-        <div className="w-full h-px bg-gray-200 my-4" />
+        <div className="my-4 h-px w-full bg-gray-200" />
 
-        <p className="text-[22px] font-medium text-gray-900 mb-2" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
+        <p
+          className="mb-2 text-center text-lg font-medium text-gray-900 sm:text-[22px]"
+          style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+        >
           Shared with {companyName}
         </p>
         <p className="text-[13px] text-gray-500 mb-4" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
@@ -1750,8 +1772,9 @@ export function Screen05Receipt({
         </div>
 
         <button
+          type="button"
           onClick={() => setAccordionOpen(!accordionOpen)}
-          className="w-full h-12 border border-gray-200 rounded-xl px-4 flex items-center justify-between mb-4"
+          className="mb-4 flex h-12 min-h-[44px] w-full items-center justify-between rounded-xl border border-gray-200 px-4"
         >
           <span className="text-[15px] font-medium text-gray-900">How is this verified?</span>
           <span className={`transform transition-transform ${accordionOpen ? "rotate-180" : ""}`}>▼</span>
@@ -1834,7 +1857,7 @@ export function Screen05Receipt({
         <button
           type="button"
           onClick={onNext}
-          className="mt-8 h-14 w-full max-w-md rounded-xl bg-[#4F46E5] text-[15px] font-semibold text-white transition-colors hover:bg-[#4338CA]"
+          className="mt-8 h-12 min-h-[44px] w-full max-w-md rounded-xl bg-[#4F46E5] text-sm font-semibold text-white transition-colors hover:bg-[#4338CA] sm:h-14 sm:text-[15px]"
           style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
         >
           Done
@@ -2103,27 +2126,27 @@ export function Screen06History({
   };
 
   return (
-    <div className="relative w-full bg-white">
-      <div className="flex h-[52px] shrink-0 items-center px-6">
+    <div className="relative w-full overflow-x-hidden bg-white">
+      <div className="flex h-11 shrink-0 items-center px-4 sm:h-[52px] sm:px-6">
         <span className="text-[17px] font-bold text-[#0F1B4C]" style={{ fontFamily: sans }}>
           Dokimos
         </span>
       </div>
 
-      <div className="px-6 pb-6 pt-2">
+      <div className="px-4 pb-6 pt-2 sm:px-6">
         <h1
-          className="text-[32px] font-bold leading-[1.15] tracking-tight text-gray-900"
+          className="text-2xl font-bold leading-[1.15] tracking-tight text-gray-900 sm:text-3xl md:text-[32px]"
           style={{ fontFamily: serif }}
         >
           Where You&apos;re Verified
         </h1>
-        <p className="mt-2 text-[14px] leading-snug text-[#6B7280]" style={{ fontFamily: sans }}>
+        <p className="mt-2 text-sm leading-snug text-[#6B7280] sm:text-[14px]" style={{ fontFamily: sans }}>
           Every place you&apos;ve shared a verified proof.
         </p>
       </div>
 
       {fetchError ? (
-        <div className="px-6 pb-10 pt-4">
+        <div className="px-4 pb-10 pt-4 sm:px-6">
           <p className="text-center text-[14px] text-red-600" style={{ fontFamily: sans }}>
             {fetchError}
           </p>
@@ -2144,7 +2167,7 @@ export function Screen06History({
           Loading…
         </div>
       ) : requests.length === 0 ? (
-        <div className="px-6 pb-16 pt-4 text-center">
+        <div className="px-4 pb-16 pt-4 text-center sm:px-6">
           <p className="text-[15px] text-[#6B7280]" style={{ fontFamily: sans }}>
             No verification requests yet.
           </p>
@@ -2155,7 +2178,7 @@ export function Screen06History({
       ) : (
         <>
           {pendingList.length > 0 ? (
-            <section className="px-6 pb-6" aria-labelledby="pending-heading">
+            <section className="px-4 pb-6 sm:px-6" aria-labelledby="pending-heading">
               <h2
                 id="pending-heading"
                 className="mb-3 text-[13px] font-semibold uppercase tracking-[0.08em] text-[#6B7280]"
@@ -2167,7 +2190,7 @@ export function Screen06History({
             </section>
           ) : null}
 
-          <section className="px-6 pb-10" aria-labelledby="completed-heading">
+          <section className="px-4 pb-10 sm:px-6" aria-labelledby="completed-heading">
             <h2
               id="completed-heading"
               className="mb-1 text-[13px] font-semibold uppercase tracking-[0.08em] text-[#6B7280]"

@@ -116,7 +116,7 @@ export function OnboardingFlow() {
 
   return (
     <>
-      <div className="relative min-h-[100dvh] w-full bg-gray-100">{content}</div>
+      <div className="relative min-h-[100dvh] w-full overflow-y-auto bg-gray-100">{content}</div>
 
       {process.env.NODE_ENV === "development" && (
         <div className="pointer-events-none fixed bottom-4 right-4 z-[100] max-w-[calc(100vw-2rem)]">
