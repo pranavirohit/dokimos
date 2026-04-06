@@ -1,19 +1,23 @@
 "use client";
 
-import { HowDokimosProtectsContent } from "@/components/dokimos/HowDokimosProtectsContent";
-import { DokimosPageChrome } from "@/components/dokimos/DokimosPageChrome";
+import { useEffect } from "react";
+import { useHowItWorksModal } from "@/contexts/HowItWorksModalContext";
 
+/**
+ * Deep links / bookmarks: open the same “How it works” overlay as in-app triggers.
+ * Closing the modal navigates to `/app/vault` (see HowItWorksModalContext).
+ */
 export default function HowItWorksPage() {
+  const { openHowItWorks } = useHowItWorksModal();
+
+  useEffect(() => {
+    openHowItWorks();
+  }, [openHowItWorks]);
+
   return (
-    <DokimosPageChrome
-      role="detail"
-      roleLabel="Help"
-      title="How Dokimos protects you"
-      description="A short walkthrough of verification—from upload to sharing proof on your terms."
-    >
-      <div className="mx-auto max-w-2xl">
-        <HowDokimosProtectsContent omitMainHeading showTechnicalDetailsButton />
-      </div>
-    </DokimosPageChrome>
+    <div
+      className="min-h-[100dvh] w-full bg-dokimos-productCanvas"
+      aria-hidden
+    />
   );
 }

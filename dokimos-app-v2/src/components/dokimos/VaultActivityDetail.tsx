@@ -2,92 +2,121 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
+import { vaultDetailTitleClass, vaultInsetPanelClass, vaultPlaidDetailCardClass } from "@/lib/vaultDetailPlaid";
 import type { VerificationRequest } from "@/types/dokimos";
+import {
+  formatVerificationAttributeKey,
+  getCompanyBadgeColor,
+  getDisplayedAttributeKeys,
+} from "@/lib/verificationRequestDisplay";
 
 const sans = "var(--font-instrument-sans), system-ui, sans-serif" as const;
 
 type VaultActivityDetailProps = {
   allRequests: VerificationRequest[];
-  /** Display time for the baseline “Identity verified” row */
-  identityVerifiedTime: string;
 };
 
-export function VaultActivityDetail({ allRequests, identityVerifiedTime }: VaultActivityDetailProps) {
-  const lines = useMemo(() => {
-    const out: { id: string; label: string; time?: string }[] = [
-      { id: "identity-verified", label: "Identity verified", time: identityVerifiedTime },
-    ];
-    const sorted = [...allRequests].sort(
-      (a, b) =>
-        new Date(b.completedAt || b.createdAt).getTime() - new Date(a.completedAt || a.createdAt).getTime()
-    );
-    for (const r of sorted) {
-      if (out.length >= 8) break;
-      const t = new Date(r.completedAt || r.createdAt).toLocaleString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      });
-      if (r.status === "pending") {
-        out.push({
-          id: `req-${r.requestId}`,
-          label: `Request pending: ${r.verifierName || "Organization"}`,
-          time: t,
-        });
-      } else if (r.status === "approved") {
-        out.push({
-          id: `req-${r.requestId}`,
-          label: `Verified share: ${r.verifierName || "Organization"}`,
-          time: t,
-        });
-      } else {
-        out.push({
-          id: `req-${r.requestId}`,
-          label: `Declined: ${r.verifierName || "Organization"}`,
-          time: t,
-        });
-      }
-    }
-    return out;
-  }, [allRequests, identityVerifiedTime]);
+function approvalTimestamp(r: VerificationRequest): string {
+  const ts = r.completedAt || r.createdAt;
+  return new Date(ts).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+export function VaultActivityDetail({ allRequests }: VaultActivityDetailProps) {
+  const approvedRequests = useMemo(() => {
+    return [...allRequests]
+      .filter((r) => r.status === "approved")
+      .sort(
+        (a, b) =>
+          new Date(b.completedAt || b.createdAt).getTime() -
+          new Date(a.completedAt || a.createdAt).getTime()
+      )
+      .slice(0, 12);
+  }, [allRequests]);
 
   return (
-    <div className="max-w-2xl">
-      <h2 className="text-2xl font-semibold tracking-tight text-slate-900" style={{ fontFamily: sans }}>
-        Activity &amp; history
-      </h2>
-      <p className="mt-2 max-w-prose text-[14px] leading-relaxed text-slate-600" style={{ fontFamily: sans }}>
-        Recent verification events and requests.
-      </p>
+    <div className="w-full">
+      <div className={vaultPlaidDetailCardClass}>
+        <div className="px-6 pb-2 pt-8 text-center sm:px-8 sm:pt-10">
+          <h2 className={vaultDetailTitleClass} style={{ fontFamily: sans }}>
+            Activity
+          </h2>
+        </div>
 
-      <ul className="mt-8 space-y-3">
-        {lines.map((line) => (
-          <li
-            key={line.id}
-            className="flex flex-col border-l-2 border-emerald-200/80 py-1 pl-4"
+        <div className="flex min-h-0 flex-1 flex-col gap-4 px-6 pb-6 pt-2 sm:px-8 sm:pb-8 sm:pt-4">
+          <div className={`overflow-hidden ${vaultInsetPanelClass}`}>
+            {approvedRequests.length === 0 ? (
+              <p
+                className="px-4 py-8 text-center text-[14px] text-slate-500 sm:px-5"
+                style={{ fontFamily: sans }}
+              >
+                When you approve a verification request, it will appear here with what was shared and when.
+              </p>
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {approvedRequests.map((r) => {
+                  const initial = (r.verifierName ?? "?").charAt(0).toUpperCase();
+                  const badgeColor = getCompanyBadgeColor(r.verifierName ?? "");
+                  const keys = getDisplayedAttributeKeys(r);
+                  const labels = keys.map(formatVerificationAttributeKey);
+                  const when = approvalTimestamp(r);
+
+                  return (
+                    <li key={r.requestId}>
+                      <div className="flex items-start gap-3 px-4 py-3.5 sm:gap-4 sm:px-5 sm:py-4">
+                        <div
+                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[15px] font-semibold text-white shadow-sm"
+                          style={{ backgroundColor: badgeColor, fontFamily: sans }}
+                          aria-hidden
+                        >
+                          {initial}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p
+                            className="text-[15px] font-semibold leading-snug text-slate-900"
+                            style={{ fontFamily: sans }}
+                          >
+                            {r.verifierName || "Organization"}
+                          </p>
+                          <p
+                            className="mt-1 text-[13px] leading-snug text-slate-600"
+                            style={{ fontFamily: sans }}
+                          >
+                            {labels.length > 0
+                              ? labels.join(" · ")
+                              : "Verification approved"}
+                          </p>
+                        </div>
+                        <time
+                          dateTime={r.completedAt || r.createdAt}
+                          className="shrink-0 pt-0.5 text-right text-[12px] text-slate-500 sm:text-[13px]"
+                          style={{ fontFamily: sans }}
+                        >
+                          {when}
+                        </time>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
+          <Link
+            href="/app/requests"
+            className="block text-center text-[13px] font-medium text-slate-600 underline decoration-slate-300 underline-offset-4 hover:text-slate-900"
+            style={{ fontFamily: sans }}
           >
-            <span className="text-[15px] text-slate-800" style={{ fontFamily: sans }}>
-              {line.label}
-            </span>
-            {line.time ? (
-              <span className="text-[13px] text-slate-500" style={{ fontFamily: sans }}>
-                {line.time}
-              </span>
-            ) : null}
-          </li>
-        ))}
-      </ul>
-
-      <Link
-        href="/app/requests"
-        className="mt-8 inline-flex text-[14px] font-medium text-emerald-700 hover:text-emerald-800 hover:underline"
-        style={{ fontFamily: sans }}
-      >
-        See all in Activity →
-      </Link>
+            See all in Activity →
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }

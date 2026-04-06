@@ -40,6 +40,18 @@ export function formatVaultAttributeDisplay(key: string, value: string | boolean
 }
 
 const VAULT_IDENTITY_KEYS = new Set(["name", "dateOfBirth", "nationality"]);
+
+/** Stable order for primary profile fields in vault UI (rows). */
+export const VAULT_PRIMARY_IDENTITY_KEYS = ["name", "dateOfBirth", "nationality"] as const;
+
+export function sortIdentityEntries(entries: [string, string | boolean][]) {
+  const map = new Map(entries);
+  const ordered: [string, string | boolean][] = [];
+  for (const k of VAULT_PRIMARY_IDENTITY_KEYS) {
+    if (map.has(k)) ordered.push([k, map.get(k)!]);
+  }
+  return ordered;
+}
 const VAULT_DOCUMENT_KEYS = new Set(["documentExpiryDate", "notExpired"]);
 const VAULT_ELIGIBILITY_KEYS = new Set(["ageOver18", "ageOver21"]);
 

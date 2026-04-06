@@ -25,31 +25,16 @@
   --font-instrument-sans: var(--font-geist-sans), system-ui, sans-serif;
 }
 
-.verifier-theme {
-  --dokimos-bg-primary: #ffffff;
-  --dokimos-bg-secondary: #f5f5f5;
-  --dokimos-bg-tertiary: #eeeeee;
-  --dokimos-bg-code: #f8f9fa;
-  --dokimos-text-primary: #1a1a1a;
-  --dokimos-text-secondary: #666666;
-  --dokimos-text-tertiary: #999999;
-  --dokimos-accent-success: #10b981;
-  --dokimos-accent-primary: #1a1a1a;
-  --dokimos-accent-technical: #6366f1;
-  --dokimos-border-subtle: #e5e7eb;
-  --dokimos-border-strong: #d1d5db;
-  --dokimos-border-table: #e0e0e0;
-}
-
-.verifier-theme .dokimos-verifier-page-title {
+/** Optional title density for business dashboard pages using `DokimosPageTitle`. */
+.dokimos-verifier-page-title {
   font-size: 1.75rem;
   font-weight: 400;
   line-height: 1.2;
   letter-spacing: -0.02em;
 }
 
-.verifier-theme .dokimos-verifier-page-title + p,
-.verifier-theme .dokimos-verifier-subtitle {
+.dokimos-verifier-page-title + p,
+.dokimos-verifier-subtitle {
   font-size: 0.875rem;
   line-height: 1.5;
 }

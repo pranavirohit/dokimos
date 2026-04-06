@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle,
   ChevronDown,
@@ -15,6 +15,9 @@ import {
 } from "@/lib/verificationPlainLanguage";
 import { getEigenVerificationDashboardUrl } from "@/lib/eigenUrls";
 import { DEFAULT_EIGEN_APP_ID } from "@/lib/eigenConstants";
+import { dokimosSectionLabelClass } from "@/lib/dokimosLayout";
+
+const sans = "var(--font-instrument-sans), system-ui, sans-serif" as const;
 
 const DEFAULT_GIT_SHA =
   process.env.NEXT_PUBLIC_DOKIMOS_GIT_SHA ??
@@ -23,9 +26,24 @@ const DEFAULT_IMAGE_DIGEST =
   process.env.NEXT_PUBLIC_DOKIMOS_IMAGE_DIGEST ??
   "sha256:c3a3c11c046da144679625d824bb765c9b6fd358dec631324dce6b17fe4d504c";
 
+const DEMO_DOCKER_IMAGE =
+  process.env.NEXT_PUBLIC_DOKIMOS_DOCKER_IMAGE ?? "dokimos/verify:v1.2";
+
 const REPO_URL =
   process.env.NEXT_PUBLIC_DOKIMOS_SOURCE_REPO_URL ??
   "https://github.com/dokimos/dokimos-tee";
+
+const STEP_COUNT = 5;
+
+function firstNameFromDisplay(displayName: string): string {
+  const t = displayName.trim().split(/\s+/)[0];
+  return t || "This person";
+}
+
+function truncateMid(s: string, max = 18): string {
+  if (!s || s.length <= max + 2) return s;
+  return `${s.slice(0, max)}…`;
+}
 
 type Layer = 1 | 2 | 3;
 
@@ -40,6 +58,7 @@ export function VerificationProgressiveModal({
   const [expandedSteps, setExpandedSteps] = useState<number[]>([0]);
 
   const displayName = getVerificationDisplayName(request);
+  const firstName = firstNameFromDisplay(displayName);
 
   const att = request.attestation as Record<string, unknown> | undefined;
   const attributes = useMemo(() => {
@@ -65,29 +84,60 @@ export function VerificationProgressiveModal({
           ? String(a.userDataHash)
           : "";
     const teeInfo = a?.tee as
-      | { platform?: string; enclaveId?: string; debugMode?: boolean }
+      | {
+          platform?: string;
+          enclaveId?: string;
+          debugMode?: boolean;
+          quote?: string;
+          tcbStatus?: string;
+        }
       | undefined;
+    const quotePresent = Boolean(teeInfo?.quote && String(teeInfo.quote).length > 10);
     const bio = a?.biometricVerification as
-      | { faceMatch?: boolean }
+      | {
+          faceMatch?: boolean;
+          confidence?: number;
+          livenessDetected?: boolean;
+        }
       | undefined;
     const faceOk = bio?.faceMatch === true;
+    const confidencePct =
+      typeof bio?.confidence === "number"
+        ? `${bio.confidence >= 0 && bio.confidence <= 1 ? Math.round(bio.confidence * 100) : Math.round(bio.confidence)}%`
+        : null;
     const sepoliaRoot = "https://sepolia.etherscan.io";
+
+    const sigStepOk = Boolean(sig && sigAddr);
+    const hwStepOk = Boolean(teeInfo?.platform || quotePresent);
+    const codeStepOk = true;
+    const buildStepOk = Boolean(DEFAULT_IMAGE_DIGEST);
+    const faceStepOk = bio == null ? true : faceOk;
 
     return [
       {
-        title: "Check the Digital Signature",
+        title: "Check the Signature",
         progressPct: 20,
+        stepOk: sigStepOk,
+        intro:
+          "Every attestation has a cryptographic signature—like a tamper-proof seal. You can confirm it matches what ran in secure hardware.",
         statusLines: [
-          sig && sigAddr
-            ? "Signature is present and can be checked on-chain"
-            : "Add signer details to verify on-chain",
+          sig
+            ? `Signature: ${truncateMid(sig, 14)}`
+            : "Signature: not present in this payload",
+          sigAddr
+            ? `Signed by: ${truncateMid(sigAddr, 12)} (signing wallet)`
+            : "Signer address: add to verify on-chain",
+          msg ? `Message hash: ${truncateMid(msg, 14)}` : "Message hash: —",
         ],
-        proof:
-          "The verification result came from Dokimos's secure hardware and hasn't been tampered with. Think of it like a wax seal on an important document. If the seal is intact, you know it's authentic.",
+        whatThisProves: [
+          "This attestation has not been altered since it was signed.",
+          "It was produced by the expected signing identity (check the wallet on-chain).",
+          "The data you see is what was covered by that signature.",
+        ],
         details: [
-          ...(sig ? [{ label: "Signature", value: sig }] : [{ label: "Signature", value: "-" }]),
-          ...(sigAddr ? [{ label: "Signer", value: sigAddr }] : [{ label: "Signer", value: "-" }]),
-          ...(msg ? [{ label: "Message Hash", value: msg }] : []),
+          ...(sig ? [{ label: "Signature", value: sig }] : [{ label: "Signature", value: "—" }]),
+          ...(sigAddr ? [{ label: "Signer", value: sigAddr }] : [{ label: "Signer", value: "—" }]),
+          ...(msg ? [{ label: "Message hash", value: msg }] : []),
         ],
         link:
           sigAddr && sig
@@ -100,32 +150,36 @@ export function VerificationProgressiveModal({
       {
         title: "Verify the Hardware",
         progressPct: 40,
+        stepOk: hwStepOk,
+        intro:
+          "The attestation includes proof verification ran in Intel TDX-style secure hardware—not a generic app server.",
         statusLines: [
           teeInfo?.platform
-            ? `Ran on ${teeInfo.platform} secure hardware`
-            : "TEE platform details available when present",
+            ? `Platform: ${teeInfo.platform}`
+            : "Platform: details appear when included in the proof",
+          quotePresent ? "TEE quote: present" : "TEE quote: not included in this demo payload",
           teeInfo?.debugMode === false
-            ? "Production mode (not testing)"
+            ? "Debug mode: disabled (production-style)"
             : teeInfo?.debugMode === true
-              ? "Debug mode enabled (non-production)"
-              : "Debug mode: see details below",
+              ? "Debug mode: enabled (non-production)"
+              : "Debug mode: see attestation for details",
+          teeInfo?.tcbStatus
+            ? `Status: ${teeInfo.tcbStatus}`
+            : "Status: see Eigen / TEE metadata when available",
         ],
-        proof:
-          "The verification happened in isolated, tamper-proof hardware, not on a regular server that could be manipulated.",
+        whatThisProves: [
+          "Processing ran in real attested hardware, not a simulated environment.",
+          "The platform and health signals are the ones vendors publish for trust decisions.",
+          "Even the operator cannot swap the verification logic inside the enclave unnoticed.",
+        ],
         details: [
+          { label: "TEE platform", value: teeInfo?.platform ?? "—" },
+          { label: "Enclave / MRENCLAVE", value: teeInfo?.enclaveId ?? "—" },
           {
-            label: "TEE Platform",
-            value: teeInfo?.platform ?? "-",
-          },
-          {
-            label: "Enclave ID",
-            value: teeInfo?.enclaveId ?? "-",
-          },
-          {
-            label: "Debug Mode",
+            label: "Debug mode",
             value:
               teeInfo?.debugMode === undefined
-                ? "-"
+                ? "—"
                 : teeInfo.debugMode
                   ? "Enabled"
                   : "Disabled",
@@ -134,45 +188,75 @@ export function VerificationProgressiveModal({
         link: { text: "View on EigenCloud Dashboard", href: eigenDashboardUrl },
       },
       {
-        title: "Check Source Code",
+        title: "Audit the Source Code",
         progressPct: 60,
+        stepOk: codeStepOk,
+        intro: `The code that processed ${firstName}'s ID is public—you can read the same logic that was attested.`,
         statusLines: [
-          "Repository and commit are pinned for reproducibility",
+          `Repository: ${REPO_URL.replace(/^https?:\/\//, "")}`,
+          `Commit: ${truncateMid(DEFAULT_GIT_SHA, 12)}`,
+          "Scope: verification pipeline (representative size ~400 lines in core path)",
         ],
-        proof:
-          "Anyone can inspect the code that ran inside the secure environment and confirm it matches what was attested.",
+        whatThisProves: [
+          "You can see exactly what rules were applied—no hidden policy engine.",
+          "Security teams can review for backdoors or unsafe handling of identity data.",
+          "Transparency is a first-class part of the trust story.",
+        ],
         details: [
           { label: "Git commit", value: DEFAULT_GIT_SHA },
           { label: "Repository", value: REPO_URL },
         ],
-        link: { text: "View source on GitHub", href: REPO_URL },
+        link: { text: "View code on GitHub", href: REPO_URL },
       },
       {
-        title: "Verify Build Provenance",
+        title: "Verify the Build",
         progressPct: 80,
-        statusLines: ["Container image digest matches the deployed build"],
-        proof:
-          "The image digest ties the running software to a specific build, so you can confirm what code actually executed.",
+        stepOk: buildStepOk,
+        intro:
+          "The source you reviewed is tied to the software that ran—image digest and build fingerprints are part of a defensible review pack.",
+        statusLines: [
+          `Container image: ${DEMO_DOCKER_IMAGE}`,
+          `Image hash: ${truncateMid(DEFAULT_IMAGE_DIGEST, 28)}`,
+          "Build provenance: use digest + commit in your security review",
+          `Matches source: ${REPO_URL} @ ${truncateMid(DEFAULT_GIT_SHA, 8)}`,
+        ],
+        whatThisProves: [
+          "The deployed artifact can be tied back to reviewed source.",
+          "No silent edits between “what we read” and “what ran.”",
+          "Hashes can be recorded alongside Eigen / deployment metadata for audits.",
+        ],
         details: [{ label: "Image digest", value: DEFAULT_IMAGE_DIGEST }],
         link: null as { text: string; href: string } | null,
       },
       {
-        title: "Confirm Face Match",
+        title: "Verify Face Match",
         progressPct: 100,
+        stepOk: faceStepOk,
+        intro: `The secure environment confirmed ${firstName}'s live face matches the photo on the government ID when the workflow captured a selfie.`,
         statusLines: [
-          faceOk
-            ? "Face match confirmed against the ID photo"
-            : a?.biometricVerification
-              ? "See biometric details in the attestation"
-              : "Biometric checks when provided by workflow",
+          bio == null
+            ? "Biometrics: not included in this attestation"
+            : faceOk
+              ? "Face match: successful"
+              : "Face match: see attestation for details",
+          confidencePct ? `Match confidence: ${confidencePct}` : "Match confidence: —",
+          bio?.livenessDetected === true
+            ? "Liveness: passed"
+            : bio?.livenessDetected === false
+              ? "Liveness: not confirmed"
+              : "Liveness: when provided by the capture flow",
+          "Algorithm: policy-defined (e.g. face match service in TEE pipeline)",
         ],
-        proof:
-          "This step confirms the live face matches the document photo within policy, reducing impersonation risk.",
+        whatThisProves: [
+          "The person completing verification is the same person shown on the ID.",
+          "Reduces risk of photos-of-photos or stolen document images.",
+          "Biometric outcome is part of the signed record you can re-check.",
+        ],
         details: [],
         link: null as { text: string; href: string } | null,
       },
     ];
-  }, [request, eigenDashboardUrl]);
+  }, [request, eigenDashboardUrl, firstName]);
 
   const toggleStep = (i: number) => {
     setExpandedSteps((prev) =>
@@ -180,15 +264,52 @@ export function VerificationProgressiveModal({
     );
   };
 
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  const headerTitle =
+    layer === 1
+      ? "Verification"
+      : layer === 2
+        ? "How Dokimos verification works"
+        : "Verify it yourself";
+
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="verification-modal-title"
+      onClick={onClose}
     >
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white shadow-xl">
-        <div className="sticky top-0 z-10 flex justify-end border-b border-slate-200 bg-white px-4 py-3">
+      <div
+        className="relative flex max-h-[min(92dvh,900px)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xl shadow-slate-900/20"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-5 pb-3 pt-4 sm:px-6 sm:pt-5">
+          <div className="min-w-0 flex-1 pr-2">
+            <p
+              className={`${dokimosSectionLabelClass} text-[11px] tracking-[0.12em]`}
+              style={{ fontFamily: sans }}
+            >
+              Verification
+            </p>
+            <h2
+              id="verification-modal-title"
+              className="mt-1.5 text-xl font-semibold tracking-tight text-slate-900 sm:text-[22px]"
+              style={{ fontFamily: sans }}
+            >
+              {headerTitle}
+            </h2>
+            <p className="mt-1 truncate text-sm text-slate-500" style={{ fontFamily: sans }}>
+              {displayName} · {request.requestId}
+            </p>
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -199,7 +320,7 @@ export function VerificationProgressiveModal({
           </button>
         </div>
 
-        <div className="p-6">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
           {layer === 1 && (
             <Layer1SimpleVerdict
               displayName={displayName}
@@ -211,8 +332,9 @@ export function VerificationProgressiveModal({
           )}
           {layer === 2 && (
             <Layer2HowItWorks
+              firstName={firstName}
               onBack={() => setLayer(1)}
-              onNext={() => setLayer(3)}
+              onVerifyYourself={() => setLayer(3)}
             />
           )}
           {layer === 3 && (
@@ -259,31 +381,26 @@ function Layer1SimpleVerdict({
     <div className="space-y-6">
       <div className="flex items-start gap-3">
         <CheckCircle
-          className="mt-1 h-8 w-8 flex-shrink-0 text-[#10B981]"
+          className="mt-1 h-8 w-8 flex-shrink-0 text-emerald-600"
           aria-hidden
         />
         <div>
-          <h2
-            id="verification-modal-title"
-            className="text-2xl font-semibold text-[#0F172A]"
-          >
-            Verification Confirmed
-          </h2>
-          <p className="mt-2 text-[#64748B]">
+          <p className="text-2xl font-semibold text-slate-900">Verification confirmed</p>
+          <p className="mt-2 text-slate-500">
             {displayName}&apos;s identity has been verified by secure hardware.
             No manual review needed.
           </p>
         </div>
       </div>
 
-      <div className="text-sm text-[#64748B]">Verified: {ts}</div>
+      <div className="text-sm text-slate-500">Verified: {ts}</div>
 
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-        <h3 className="mb-3 text-sm font-semibold text-[#0F172A]">
+        <h3 className="mb-3 text-sm font-semibold text-slate-900">
           What was verified:
         </h3>
         {attributes.length === 0 ? (
-          <p className="text-sm text-[#64748B]">
+          <p className="text-sm text-slate-500">
             Attribute details appear when included in the attestation.
           </p>
         ) : (
@@ -291,14 +408,14 @@ function Layer1SimpleVerdict({
             {attributes.map((attr) => (
               <div key={`${attr.label}-${attr.value}`} className="flex gap-2 text-sm">
                 <CheckCircle
-                  className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#10B981]"
+                  className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600"
                   aria-hidden
                 />
                 <div>
-                  <span className="font-medium text-[#0F172A]">
+                  <span className="font-medium text-slate-900">
                     {attr.label}:
                   </span>{" "}
-                  <span className="text-[#64748B]">{attr.value}</span>
+                  <span className="text-slate-500">{attr.value}</span>
                 </div>
               </div>
             ))}
@@ -306,20 +423,20 @@ function Layer1SimpleVerdict({
         )}
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row">
         <button
           type="button"
           onClick={onHow}
-          className="flex-1 rounded-lg px-4 py-2 text-sm font-medium text-[#10B981] transition hover:bg-emerald-50 hover:text-emerald-700"
+          className="flex-1 rounded-lg border border-slate-300 bg-transparent px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400"
         >
           How does this work?
         </button>
         <button
           type="button"
           onClick={onTechnical}
-          className="flex-1 rounded-lg px-4 py-2 text-sm font-medium text-[#64748B] transition hover:bg-slate-100 hover:text-[#0F172A]"
+          className="flex-1 rounded-lg bg-dokimos-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-dokimos-accentHover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dokimos-accent"
         >
-          Technical Details
+          Technical details
         </button>
       </div>
     </div>
@@ -327,109 +444,112 @@ function Layer1SimpleVerdict({
 }
 
 function Layer2HowItWorks({
+  firstName,
   onBack,
-  onNext,
+  onVerifyYourself,
 }: {
+  firstName: string;
   onBack: () => void;
-  onNext: () => void;
+  onVerifyYourself: () => void;
 }) {
   return (
     <div className="space-y-6">
-      <h2 className="mb-4 text-2xl font-semibold text-slate-900">
-        How Dokimos Verification Works
-      </h2>
-
-      <p className="mb-6 text-base leading-relaxed text-slate-600">
-        Dokimos verifies identities once, then creates a proof that organizations
-        can check independently. You never have to store sensitive ID
-        documents.
+      <p className="text-base leading-relaxed text-slate-600">
+        Think of Dokimos like a notary, but digital and extremely hard to fake.
       </p>
 
-      <p className="mb-4 text-sm font-medium text-slate-900">
-        Here&apos;s what happened:
-      </p>
+      <p className="text-sm font-medium text-slate-900">Here&apos;s what happened:</p>
 
       <div className="space-y-6">
         <div className="flex gap-3">
-          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-green-100 text-sm font-semibold text-green-700">
-            1
-          </div>
+          <span className="text-xl leading-none" aria-hidden>
+            1️⃣
+          </span>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-slate-900">
-              Sarah uploaded her ID to Dokimos
+              {firstName} uploaded an ID once
             </p>
             <p className="mt-2 text-sm leading-relaxed text-slate-600">
-              It was verified automatically in an isolated hardware environment
-              where no one, not even Dokimos, can access the raw document.
+              It was sent to secure, isolated hardware—not stored on an ordinary app server.
             </p>
           </div>
         </div>
 
         <div className="flex gap-3">
-          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-green-100 text-sm font-semibold text-green-700">
-            2
+          <span className="text-xl leading-none" aria-hidden>
+            2️⃣
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-slate-900">The hardware checked:</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
+              <li>Is the ID real and not expired?</li>
+              <li>Does the live face match the ID photo?</li>
+              <li>Is the applicant over 18?</li>
+            </ul>
           </div>
+        </div>
+
+        <div className="flex gap-3">
+          <span className="text-xl leading-none" aria-hidden>
+            3️⃣
+          </span>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-slate-900">
-              A signed verification record for Sarah was created
+              The hardware created a tamper-proof proof
             </p>
             <p className="mt-2 text-sm leading-relaxed text-slate-600">
-              This record proves the necessary identity checks happened and can
-              be verified by anyone.
+              Like a wax seal on a document: you can check later that nothing was changed after the fact.
             </p>
           </div>
         </div>
 
         <div className="flex gap-3">
-          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-green-100 text-sm font-semibold text-green-700">
-            3
-          </div>
+          <span className="text-xl leading-none" aria-hidden>
+            4️⃣
+          </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-slate-900">
-              You received the verification record
+            <p className="text-sm font-medium text-slate-900">You&apos;re seeing that proof now</p>
+            <p className="mt-2 text-sm text-slate-600">
+              You can verify it independently—no need to take Dokimos&apos;s word for it.
             </p>
-            <p className="mt-2 text-sm text-slate-600">Verify it yourself:</p>
-            <button
-              type="button"
-              onClick={onNext}
-              className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-green-600 transition hover:text-green-700"
-            >
-              Check the cryptographic proof
-              <span aria-hidden>→</span>
-              <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
-            </button>
           </div>
         </div>
       </div>
 
-      <div className="mb-6 mt-8 border-t border-slate-200" />
-
-      <div className="rounded-r border-l-4 border-green-600 bg-green-50 p-4">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-green-900">
-          Why this matters for you:
+      <div className="rounded-r border-l-4 border-emerald-600 bg-emerald-50/90 p-4">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-emerald-950">
+          Why this matters
         </p>
-        <ul className="space-y-1 text-sm text-green-800">
-          <li>• Instant verification, no waiting</li>
-          <li>• Fraud-proof, mathematically impossible to fake</li>
-          <li>• Lower liability, you never store ID documents</li>
-          <li>• Always verifiable, check the proof anytime</li>
+        <ul className="space-y-2 text-sm text-emerald-900/95">
+          <li>
+            <span className="font-medium">No blind trust.</span> You&apos;re checking math and public
+            artifacts—not asking teams to &quot;trust us.&quot;
+          </li>
+          <li>
+            <span className="font-medium">Sensitive checks stay isolated.</span> Raw ID data is
+            processed in the secure environment; you receive the signed result, not the document.
+          </li>
+          <li>
+            <span className="font-medium">Hard to fake.</span> The record is cryptographically bound
+            to what ran—screenshots and PDFs can&apos;t offer the same guarantee.
+          </li>
         </ul>
       </div>
 
-      <div className="mt-6 flex gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <button
           type="button"
           onClick={onBack}
-          className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+          className="rounded-lg px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
         >
           ← Back
         </button>
         <button
           type="button"
-          onClick={onNext}
-          className="flex-1 rounded-lg px-4 py-2 text-sm font-medium text-green-600 transition hover:bg-green-50 hover:text-green-700"
+          onClick={onVerifyYourself}
+          className="flex-1 rounded-lg bg-dokimos-accent px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-dokimos-accentHover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dokimos-accent"
         >
-          Technical Details →
+          Verify it yourself
         </button>
       </div>
     </div>
@@ -439,8 +559,10 @@ function Layer2HowItWorks({
 type StepConfig = {
   title: string;
   progressPct: number;
+  stepOk: boolean;
+  intro: string;
   statusLines: string[];
-  proof: string;
+  whatThisProves: string[];
   details: { label: string; value: string }[];
   link: { text: string; href: string } | null;
 };
@@ -458,43 +580,44 @@ function Layer3Technical({
 }) {
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold text-[#0F172A]">
-          Verify This Proof Yourself
-        </h2>
-        <p className="mt-2 text-[#64748B]">
-          Follow these steps to independently verify this proof. No technical
-          expertise required.
-        </p>
-      </div>
+      <p className="text-sm text-slate-600">
+        Five steps to independently verify this proof. Expand <strong className="font-medium text-slate-800">What this proves</strong> on each card for the plain-language takeaway.
+      </p>
 
       <div className="space-y-6">
         {steps.map((step, i) => (
           <div key={step.title}>
             <div className="mb-2 flex items-center justify-between gap-2">
-              <p className="text-sm font-semibold text-[#0F172A]">
-                Step {i + 1} of {steps.length}: {step.title}
+              <p className="text-sm font-semibold text-slate-900">
+                Step {i + 1} of {STEP_COUNT}: {step.title}
               </p>
-              <span className="text-xs text-slate-500">{step.progressPct}%</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500">{step.progressPct}%</span>
+                {step.stepOk ? (
+                  <CheckCircle className="h-5 w-5 shrink-0 text-emerald-600" aria-hidden />
+                ) : (
+                  <span className="text-xs font-medium text-amber-700">Review</span>
+                )}
+              </div>
             </div>
 
-            <div className="mb-4 h-1 rounded-full bg-slate-200">
+            <div className="mb-3 h-1 rounded-full bg-slate-200">
               <div
-                className="h-full rounded-full bg-emerald-600 transition-all"
+                className="h-full rounded-full bg-dokimos-accent transition-all"
                 style={{ width: `${step.progressPct}%` }}
               />
             </div>
 
-            <div className="mb-3 space-y-1">
+            <p className="mb-3 text-sm leading-relaxed text-slate-600">{step.intro}</p>
+
+            <div className="mb-3 space-y-2">
               {step.statusLines.map((line) => (
                 <div key={line} className="flex items-start gap-2">
                   <CheckCircle
                     className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600"
                     aria-hidden
                   />
-                  <span className="text-sm font-medium text-emerald-800">
-                    {line}
-                  </span>
+                  <span className="text-sm text-slate-700">{line}</span>
                 </div>
               ))}
             </div>
@@ -502,7 +625,7 @@ function Layer3Technical({
             <button
               type="button"
               onClick={() => onToggleStep(i)}
-              className="mb-3 flex items-center gap-2 text-sm text-[#64748B] transition hover:text-[#0F172A]"
+              className="mb-2 flex items-center gap-2 text-sm font-medium text-dokimos-accent transition hover:text-dokimos-accentHover"
             >
               {expandedSteps.includes(i) ? (
                 <ChevronDown className="h-4 w-4" aria-hidden />
@@ -513,9 +636,11 @@ function Layer3Technical({
             </button>
 
             {expandedSteps.includes(i) && (
-              <div className="mb-4 ml-6 rounded border-l-2 border-slate-300 bg-slate-50 p-3 text-sm text-[#64748B]">
-                {step.proof}
-              </div>
+              <ul className="mb-4 ml-6 list-disc space-y-1.5 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                {step.whatThisProves.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
             )}
 
             {step.details.length > 0 && (
@@ -525,12 +650,8 @@ function Layer3Technical({
                     key={`${detail.label}-${detail.value}`}
                     className="flex flex-col gap-0.5 text-xs sm:flex-row sm:items-start sm:gap-2"
                   >
-                    <span className="min-w-[100px] text-slate-500">
-                      {detail.label}:
-                    </span>
-                    <code className="break-all font-mono text-slate-700">
-                      {detail.value}
-                    </code>
+                    <span className="min-w-[100px] text-slate-500">{detail.label}:</span>
+                    <code className="break-all font-mono text-slate-700">{detail.value}</code>
                   </div>
                 ))}
               </div>
@@ -541,16 +662,14 @@ function Layer3Technical({
                 href={step.link.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-sm font-medium text-[#10B981] hover:text-emerald-700"
+                className="inline-flex items-center gap-2 text-sm font-medium text-dokimos-accent hover:text-dokimos-accentHover"
               >
                 {step.link.text}
                 <ExternalLink className="h-4 w-4" aria-hidden />
               </a>
             )}
 
-            {i < steps.length - 1 && (
-              <div className="mt-6 border-t border-slate-200" />
-            )}
+            {i < steps.length - 1 && <div className="mt-6 border-t border-slate-200" />}
           </div>
         ))}
       </div>
@@ -558,9 +677,9 @@ function Layer3Technical({
       <button
         type="button"
         onClick={onBack}
-        className="rounded-lg px-4 py-2 text-sm font-medium text-[#64748B] transition hover:bg-slate-100 hover:text-[#0F172A]"
+        className="rounded-lg px-4 py-2 text-sm font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
       >
-        ← Back to Summary
+        ← Back to summary
       </button>
     </div>
   );

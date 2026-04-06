@@ -98,12 +98,20 @@ export function DokimosSurfaceCard({ children, className = "" }: DokimosSurfaceC
   return <div className={`${dokimosCardClass} ${className}`.trim()}>{children}</div>;
 }
 
-type HubAction = {
-  href: string;
-  label: string;
-  variant?: "primary" | "secondary";
-  badge?: number;
-};
+/** Hub CTA: navigate (`href`) or open in-app UI (`onClick`), e.g. How it works modal. */
+export type HubAction =
+  | {
+      href: string;
+      label: string;
+      variant?: "primary" | "secondary";
+      badge?: number;
+    }
+  | {
+      onClick: () => void;
+      label: string;
+      variant?: "primary" | "secondary";
+      badge?: number;
+    };
 
 type DokimosHubActionRowProps = {
   actions: HubAction[];
@@ -115,19 +123,14 @@ type DokimosHubActionRowProps = {
 export function DokimosHubActionRow({ actions }: DokimosHubActionRowProps) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-      {actions.map((a) => (
-        <Link
-          key={a.href + a.label}
-          href={a.href}
-          className={
-            a.variant === "primary"
-              ? "flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl bg-dokimos-accent px-4 py-3 text-center text-[14px] font-semibold text-white shadow-sm transition-colors hover:bg-dokimos-accentHover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dokimos-accent sm:min-w-[160px] sm:flex-initial"
-              : "flex min-h-[48px] flex-1 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-[14px] font-semibold text-slate-800 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dokimos-accent sm:flex-initial"
-          }
-          style={{ fontFamily: sans }}
-        >
-          {a.label}
-          {a.badge != null && a.badge > 0 ? (
+      {actions.map((a) => {
+        const className =
+          a.variant === "primary"
+            ? "flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl bg-dokimos-accent px-4 py-3 text-center text-[14px] font-semibold text-white shadow-sm transition-colors hover:bg-dokimos-accentHover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dokimos-accent sm:min-w-[160px] sm:flex-initial"
+            : "flex min-h-[48px] flex-1 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-3 text-center text-[14px] font-semibold text-slate-800 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dokimos-accent sm:min-w-[160px] sm:flex-initial";
+        const key = "href" in a ? `${a.href}-${a.label}` : `action-${a.label}`;
+        const badge =
+          a.badge != null && a.badge > 0 ? (
             <span
               className={
                 a.variant === "primary"
@@ -137,9 +140,28 @@ export function DokimosHubActionRow({ actions }: DokimosHubActionRowProps) {
             >
               {a.badge > 9 ? "9+" : a.badge}
             </span>
-          ) : null}
-        </Link>
-      ))}
+          ) : null;
+        if ("onClick" in a) {
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={a.onClick}
+              className={className}
+              style={{ fontFamily: sans }}
+            >
+              {a.label}
+              {badge}
+            </button>
+          );
+        }
+        return (
+          <Link key={key} href={a.href} className={className} style={{ fontFamily: sans }}>
+            {a.label}
+            {badge}
+          </Link>
+        );
+      })}
     </div>
   );
 }

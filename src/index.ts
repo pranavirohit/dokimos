@@ -312,12 +312,21 @@ const requests = new Map<string, VerificationRequest>();
 /** Demo accounts share password `demo1234` (min 8 chars). Hashed once at startup. */
 async function seedDemoAccounts(): Promise<void> {
   const demoHash = await bcrypt.hash('demo1234', 10);
-  users.set('pranavi@example.com', {
-    userId: 'user_001',
-    name: 'Pranavi Rohit',
-    email: 'pranavi@example.com',
-    passwordHash: demoHash,
-  });
+  /** Four consumer demo personas — match dokimos-app-v2 demo login + verifier "Send request" UI. */
+  const demoConsumers: { email: string; name: string; userId: string }[] = [
+    { email: 'janice.sample@example.com', name: 'Janice Sample', userId: 'user_janice' },
+    { email: 'marcus.chen@example.com', name: 'Marcus Chen', userId: 'user_marcus' },
+    { email: 'sara.kim@example.com', name: 'Sara Kim', userId: 'user_sara' },
+    { email: 'alex.rivera@example.com', name: 'Alex Rivera', userId: 'user_alex' },
+  ];
+  for (const u of demoConsumers) {
+    users.set(u.email, {
+      userId: u.userId,
+      name: u.name,
+      email: u.email,
+      passwordHash: demoHash,
+    });
+  }
   const demoVerifiers: [string, string, string][] = [
     ['acme@brokerage.com', 'verifier_001', 'Acme Brokerage'],
     ['verify@coinbase.com', 'verifier_002', 'Coinbase'],
@@ -433,7 +442,7 @@ function seedVerifierDashboardDemos(): void {
 
 /** Populates in-memory requests so the user app “Where you’ve verified” screen has demo rows. */
 function seedDemoVerificationRequests(): void {
-  const userEmail = 'pranavi@example.com';
+  const userEmail = 'janice.sample@example.com';
   const now = Date.now();
   const day = 86400000;
 
@@ -479,7 +488,7 @@ function seedDemoVerificationRequests(): void {
       completedAt: new Date(now - 2 * day).toISOString(),
       attestation: mockAtt(
         {
-          name: 'Jordan Sample',
+          name: 'Janice Sample',
           ageOver21: true,
           notExpired: true,
         },
@@ -498,7 +507,7 @@ function seedDemoVerificationRequests(): void {
       createdAt: new Date(now - 4 * day).toISOString(),
       completedAt: new Date(now - 4 * day).toISOString(),
       attestation: mockAtt(
-        { name: 'Jordan Sample', notExpired: true },
+        { name: 'Janice Sample', notExpired: true },
         new Date(now - 4 * day).toISOString()
       ),
     },
@@ -514,7 +523,7 @@ function seedDemoVerificationRequests(): void {
       createdAt: new Date(now - 9 * day).toISOString(),
       completedAt: new Date(now - 9 * day).toISOString(),
       attestation: mockAtt(
-        { name: 'Jordan Sample', nationality: 'United States' },
+        { name: 'Janice Sample', nationality: 'United States' },
         new Date(now - 9 * day).toISOString()
       ),
     },
@@ -531,7 +540,7 @@ function seedDemoVerificationRequests(): void {
       completedAt: new Date(now - 120 * day).toISOString(),
       attestation: mockAtt(
         {
-          name: 'Jordan Sample',
+          name: 'Janice Sample',
           dateOfBirth: '1990-01-15',
           ageOver18: true,
           ageOver21: true,

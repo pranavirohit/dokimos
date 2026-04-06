@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 import { ArrowLeft } from "lucide-react";
 import { DokimosBrandBackdrop } from "@/components/dokimos/DokimosBrandBackdrop";
 import { VaultActivityDetail } from "@/components/dokimos/VaultActivityDetail";
@@ -12,6 +13,11 @@ import { VaultRequestsDetail } from "@/components/dokimos/VaultRequestsDetail";
 import type { AttestationData, VerificationRequest } from "@/types/dokimos";
 
 export type VaultDetailView = "identity" | "requests" | "activity";
+
+function firstNameFromSession(name: string | null | undefined): string {
+  if (!name?.trim()) return "there";
+  return name.trim().split(/\s+/)[0] ?? "there";
+}
 
 export type VaultNavigationDashboardProps = {
   verificationUrl?: string;
@@ -25,8 +31,6 @@ export type VaultNavigationDashboardProps = {
   reVerifyError: string | null;
   onReVerify: () => void;
   onReviewRequest: (req: VerificationRequest) => void;
-  /** Formatted “last verified” time for activity baseline */
-  identityVerifiedTime: string;
 };
 
 export function VaultNavigationDashboard({
@@ -41,8 +45,9 @@ export function VaultNavigationDashboard({
   reVerifyError,
   onReVerify,
   onReviewRequest,
-  identityVerifiedTime,
 }: VaultNavigationDashboardProps) {
+  const { data: session } = useSession();
+  const welcomeName = firstNameFromSession(session?.user?.name);
   const [activeView, setActiveView] = useState<VaultDetailView | null>(null);
 
   const navCards: {
@@ -53,7 +58,7 @@ export function VaultNavigationDashboard({
   }[] = [
     { id: "identity", title: "View your verified identity", shortLabel: "Verified identity", delay: 0 },
     { id: "requests", title: "Review pending requests", shortLabel: "Pending requests", delay: 0.1 },
-    { id: "activity", title: "See activity history", shortLabel: "Activity history", delay: 0.2 },
+    { id: "activity", title: "See approved activity", shortLabel: "Activity", delay: 0.2 },
   ];
 
   const handleCardActivate = (id: VaultDetailView) => {
@@ -118,7 +123,7 @@ export function VaultNavigationDashboard({
                     className="mb-10 space-y-4 lg:mb-14"
                   >
                     <h1 className="font-landing text-5xl font-bold leading-[1.08] tracking-[-0.03em] text-white lg:text-6xl xl:text-7xl">
-                      Your vault
+                      Welcome, {welcomeName}
                     </h1>
                     <p className="max-w-xl text-lg text-slate-300 lg:text-xl">
                       One verified identity. Trusted everywhere.
@@ -133,7 +138,7 @@ export function VaultNavigationDashboard({
                     transition={{ duration: 0.25 }}
                     className="mb-6 text-xl font-medium text-white"
                   >
-                    Your vault
+                    Welcome, {welcomeName}
                   </motion.h2>
                 )}
               </AnimatePresence>
@@ -215,19 +220,23 @@ export function VaultNavigationDashboard({
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 48 }}
             transition={{ duration: 0.35, ease: "easeOut" }}
-            className="fixed inset-0 z-[60] flex min-h-0 flex-1 flex-col overflow-hidden bg-[#FAFAF9] lg:static lg:z-0 lg:max-w-none"
+            className="fixed inset-0 z-[60] flex min-h-0 flex-1 flex-col overflow-hidden bg-[#eceef1] lg:static lg:z-0 lg:max-w-none"
           >
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-6 py-6 lg:p-8">
-              <button
-                type="button"
-                onClick={handleBack}
-                className="mb-6 flex items-center gap-2 text-slate-600 transition-colors hover:text-slate-900"
-              >
-                <ArrowLeft className="h-5 w-5 shrink-0" aria-hidden />
-                <span className="text-[15px] font-medium" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
-                  Back to vault
-                </span>
-              </button>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-6 sm:px-8 lg:px-10 lg:py-10">
+              <div className="mx-auto flex w-full max-w-[640px] flex-col">
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  className="mb-6 flex w-fit items-center gap-2 text-slate-600 transition-colors hover:text-slate-900"
+                >
+                  <ArrowLeft className="h-5 w-5 shrink-0" aria-hidden />
+                  <span
+                    className="text-[15px] font-medium"
+                    style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+                  >
+                    Back to vault
+                  </span>
+                </button>
 
               {activeView === "identity" ? (
                 <VaultIdentityDetail
@@ -249,8 +258,9 @@ export function VaultNavigationDashboard({
               ) : null}
 
               {activeView === "activity" ? (
-                <VaultActivityDetail allRequests={allRequests} identityVerifiedTime={identityVerifiedTime} />
+                <VaultActivityDetail allRequests={allRequests} />
               ) : null}
+              </div>
             </div>
           </motion.div>
         ) : null}

@@ -3,7 +3,7 @@
 import { ExternalLink } from "lucide-react";
 import { getEigenVerificationDashboardUrl } from "@/lib/eigenUrls";
 
-const sans = "var(--font-instrument-sans), system-ui, sans-serif" as const;
+const DEFAULT_SANS = "var(--font-instrument-sans), system-ui, sans-serif" as const;
 const serif = "var(--font-instrument-serif), Georgia, serif" as const;
 
 type HowDokimosProtectsContentProps = {
@@ -11,6 +11,10 @@ type HowDokimosProtectsContentProps = {
   omitMainHeading?: boolean;
   /** When true, shows the Eigen "View technical details" button in the trust section. */
   showTechnicalDetailsButton?: boolean;
+  /** Body/UI sans stack (default: Geist via `--font-instrument-sans`). Use `--font-landing-sans` for Plus Jakarta. */
+  sansFontStack?: string;
+  /** Section titles (h1 when shown, h2 blocks). Defaults to Instrument Serif. Match `sansFontStack` for all-sans (e.g. Plus Jakarta in the How it works modal). */
+  headingFontStack?: string;
 };
 
 const STEPS: {
@@ -49,15 +53,19 @@ const STEPS: {
 export function HowDokimosProtectsContent({
   omitMainHeading = false,
   showTechnicalDetailsButton = true,
+  sansFontStack = DEFAULT_SANS,
+  headingFontStack,
 }: HowDokimosProtectsContentProps) {
   const eigenUrl = getEigenVerificationDashboardUrl();
+  const sans = sansFontStack;
+  const headingFont = headingFontStack ?? serif;
 
   return (
     <>
       {!omitMainHeading && (
         <h1
           className="text-center text-[28px] font-semibold leading-tight tracking-tight text-slate-900 sm:text-[32px]"
-          style={{ fontFamily: serif }}
+          style={{ fontFamily: headingFont }}
         >
           How Dokimos protects your identity
         </h1>
@@ -100,7 +108,7 @@ export function HowDokimosProtectsContent({
       </div>
 
       <section className="mt-10 space-y-3" style={{ fontFamily: sans }}>
-        <h2 className="text-[20px] font-semibold text-slate-900" style={{ fontFamily: serif }}>
+        <h2 className="text-[20px] font-semibold text-slate-900" style={{ fontFamily: headingFont }}>
           What happens to your ID?
         </h2>
         <p className="text-[14px] leading-relaxed text-slate-600">
@@ -120,7 +128,7 @@ export function HowDokimosProtectsContent({
       </section>
 
       <section className="mt-8 space-y-3" style={{ fontFamily: sans }}>
-        <h2 className="text-[20px] font-semibold text-slate-900" style={{ fontFamily: serif }}>
+        <h2 className="text-[20px] font-semibold text-slate-900" style={{ fontFamily: headingFont }}>
           What is a verified credential?
         </h2>
         <p className="text-[14px] leading-relaxed text-slate-600">
@@ -137,7 +145,7 @@ export function HowDokimosProtectsContent({
       </section>
 
       <section className="mt-8 space-y-3" style={{ fontFamily: sans }}>
-        <h2 className="text-[20px] font-semibold text-slate-900" style={{ fontFamily: serif }}>
+        <h2 className="text-[20px] font-semibold text-slate-900" style={{ fontFamily: headingFont }}>
           How can I trust this?
         </h2>
         <p className="text-[14px] leading-relaxed text-slate-600">

@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import { AppShellLayout } from "@/components/dokimos/AppShellLayout";
 import { RequestNotificationsProvider } from "@/contexts/RequestNotificationsContext";
+import { HowItWorksModalProvider } from "@/contexts/HowItWorksModalContext";
 import { AppRouteGuard } from "./AppRouteGuard";
 
 function AppShellWithTabs({ children }: { children: React.ReactNode }) {
@@ -21,9 +22,11 @@ export default function AppGroupLayout({
       }
     >
       <AppRouteGuard>
-        <RequestNotificationsProvider>
-          <AppShellWithTabs>{children}</AppShellWithTabs>
-        </RequestNotificationsProvider>
+        <HowItWorksModalProvider>
+          <RequestNotificationsProvider>
+            <AppShellWithTabs>{children}</AppShellWithTabs>
+          </RequestNotificationsProvider>
+        </HowItWorksModalProvider>
       </AppRouteGuard>
     </Suspense>
   );

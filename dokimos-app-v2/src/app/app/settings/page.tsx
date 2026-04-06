@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { ChevronRight, ExternalLink } from "lucide-react";
 import { useDokimosApp } from "@/contexts/DokimosAppContext";
+import { useHowItWorksModal } from "@/contexts/HowItWorksModalContext";
 import { DokimosPageChrome } from "@/components/dokimos/DokimosPageChrome";
 import { getEigenVerificationDashboardUrl } from "@/lib/eigenUrls";
 
@@ -43,6 +44,7 @@ function SettingsLinkRow({
 
 export default function SettingsPage() {
   const router = useRouter();
+  const { openHowItWorks } = useHowItWorksModal();
   const { data: session, status } = useSession();
   const { attestationData } = useDokimosApp();
   const eigenUrl = getEigenVerificationDashboardUrl();
@@ -127,7 +129,7 @@ export default function SettingsPage() {
           <SettingsLinkRow
             title="How Dokimos works"
             subtitle="Learn about secure ID verification"
-            onClick={() => router.push("/app/how-it-works")}
+            onClick={openHowItWorks}
           />
           <SettingsLinkRow
             title="View TEE attestation"

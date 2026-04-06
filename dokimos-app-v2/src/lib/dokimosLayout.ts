@@ -13,7 +13,8 @@ export type DokimosScreenRole =
   | "detail"
   | "flow"
   | "settings"
-  | "legal";
+  | "legal"
+  | "business";
 
 export const DOKIMOS_ROLE_LABEL: Record<DokimosScreenRole, string> = {
   hub: "Home",
@@ -21,6 +22,7 @@ export const DOKIMOS_ROLE_LABEL: Record<DokimosScreenRole, string> = {
   flow: "Verification",
   settings: "Account",
   legal: "Legal",
+  business: "Business",
 };
 
 /** Page canvas (onboarding + `/app/*`) — `dokimos.productCanvas` in Tailwind. */

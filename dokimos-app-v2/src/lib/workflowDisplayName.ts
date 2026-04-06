@@ -4,7 +4,6 @@ export function workflowDisplayName(workflow?: string): string {
   const map: Record<string, string> = {
     host_verification: "Host verification",
     guest_verification: "Guest identity check",
-    experience_host: "Experience host verification",
     driver_background_check: "Driver background check",
     driver_onboarding: "Driver onboarding",
     vehicle_registration: "Vehicle registration",

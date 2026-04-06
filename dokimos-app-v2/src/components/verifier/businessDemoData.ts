@@ -40,7 +40,7 @@ const thirtyMinAgo = new Date(Date.now() - 30 * 60000).toISOString();
 
 /**
  * Offline demo rows for `/business` — aligned with Programs tab workflows (`host_verification`,
- * `guest_verification`, `experience_host`) and `airbnb_prod` verifier id.
+ * `guest_verification`) and `airbnb_prod` verifier id.
  */
 export const BUSINESS_DEMO_REQUESTS: VerificationRequest[] = [
   {
@@ -65,9 +65,9 @@ export const BUSINESS_DEMO_REQUESTS: VerificationRequest[] = [
   {
     requestId: "req_airbnb_002",
     ...V,
-    userEmail: "sarah.chen@outlook.com",
-    requestedAttributes: ["name", "ageOver21", "notExpired"],
-    workflow: "experience_host",
+    userEmail: "janice.sample@example.com",
+    requestedAttributes: ["name", "ageOver18", "address", "notExpired"],
+    workflow: "host_verification",
     status: "pending",
     createdAt: fiveHoursAgo,
     attestation: null,

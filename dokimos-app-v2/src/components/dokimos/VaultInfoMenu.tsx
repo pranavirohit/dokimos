@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { ExternalLink, Info } from "lucide-react";
 import { getEigenVerificationDashboardUrl } from "@/lib/eigenUrls";
+import { useHowItWorksModal } from "@/contexts/HowItWorksModalContext";
 
 const sans = "var(--font-instrument-sans), system-ui, sans-serif" as const;
 
@@ -15,7 +15,7 @@ type VaultInfoMenuProps = {
 };
 
 export function VaultInfoMenu({ verificationUrl, tone = "default" }: VaultInfoMenuProps) {
-  const router = useRouter();
+  const { openHowItWorks } = useHowItWorksModal();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const eigenUrl = verificationUrl ?? getEigenVerificationDashboardUrl();
@@ -30,11 +30,6 @@ export function VaultInfoMenu({ verificationUrl, tone = "default" }: VaultInfoMe
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
-
-  const go = (path: string) => {
-    setOpen(false);
-    router.push(path);
-  };
 
   const openEigen = () => {
     setOpen(false);
@@ -65,7 +60,10 @@ export function VaultInfoMenu({ verificationUrl, tone = "default" }: VaultInfoMe
           <button
             type="button"
             role="menuitem"
-            onClick={() => go("/app/how-it-works")}
+            onClick={() => {
+              setOpen(false);
+              openHowItWorks();
+            }}
             className="flex w-full flex-col items-start gap-0.5 px-4 py-3 text-left transition-colors hover:bg-slate-50"
             style={{ fontFamily: sans }}
           >
@@ -84,16 +82,6 @@ export function VaultInfoMenu({ verificationUrl, tone = "default" }: VaultInfoMe
               <ExternalLink size={13} className="opacity-60" aria-hidden />
             </span>
             <span className="text-[12px] text-slate-500">Check the cryptographic proof</span>
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => go("/app/privacy")}
-            className="flex w-full flex-col items-start gap-0.5 border-t border-slate-100 px-4 py-3 text-left transition-colors hover:bg-slate-50"
-            style={{ fontFamily: sans }}
-          >
-            <span className="text-[14px] font-semibold text-slate-900">Privacy &amp; security</span>
-            <span className="text-[12px] text-slate-500">What we can and can&apos;t see</span>
           </button>
         </div>
       ) : null}

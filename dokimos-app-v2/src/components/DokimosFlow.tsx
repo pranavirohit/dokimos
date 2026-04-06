@@ -29,20 +29,27 @@ import { useSession } from "next-auth/react";
 import {
   DokimosHubActionRow,
   DokimosPageChrome,
-  DokimosSection,
   DokimosSurfaceCard,
+  type HubAction,
 } from "@/components/dokimos/DokimosPageChrome";
+import { useHowItWorksModal } from "@/contexts/HowItWorksModalContext";
 import { VaultInfoMenu } from "@/components/dokimos/VaultInfoMenu";
+import { VaultCredentialRowList } from "@/components/dokimos/VaultVerifiedAttributeList";
 import { VaultNavigationDashboard } from "@/components/dokimos/VaultHomepage";
 import { PlaidSplitOnboardingLayout } from "@/components/dokimos/onboarding/PlaidSplitOnboardingLayout";
 import { getEigenVerificationDashboardUrl } from "@/lib/eigenUrls";
 import {
   VAULT_DEMO_ATTRIBUTES,
-  VAULT_ATTR_LABELS,
   formatVaultAttributeDisplay,
   groupVaultAttributes,
+  sortIdentityEntries,
 } from "@/lib/vaultAttributes";
 import { workflowDisplayName } from "@/lib/workflowDisplayName";
+import {
+  formatVerificationAttributeKey,
+  getCompanyBadgeColor,
+  getDisplayedAttributeKeys,
+} from "@/lib/verificationRequestDisplay";
 import { useDokimosApp } from "@/contexts/DokimosAppContext";
 import {
   STORAGE_HAS_ENCRYPTED_ID,
@@ -598,6 +605,7 @@ export function Screen03Vault({
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
   const { setSelectedRequest, setAttestationData } = useDokimosApp();
+  const { openHowItWorks } = useHowItWorksModal();
 
   const attributes = useMemo(
     () => attestationData?.attributes ?? VAULT_DEMO_ATTRIBUTES,
@@ -625,12 +633,7 @@ export function Screen03Vault({
 
   const hubActions = useMemo(() => {
     const n = pendingRequests.length;
-    const actions: {
-      href: string;
-      label: string;
-      variant?: "primary" | "secondary";
-      badge?: number;
-    }[] = [];
+    const actions: HubAction[] = [];
     if (n > 0) {
       actions.push({
         href: "/app/requests",
@@ -644,9 +647,13 @@ export function Screen03Vault({
       label: "Activity & history",
       variant: n > 0 ? "secondary" : "primary",
     });
-    actions.push({ href: "/app/how-it-works", label: "How Dokimos works", variant: "secondary" });
+    actions.push({
+      onClick: openHowItWorks,
+      label: "How Dokimos works",
+      variant: "secondary",
+    });
     return actions;
-  }, [pendingRequests.length]);
+  }, [pendingRequests.length, openHowItWorks]);
   const [requestsLoading, setRequestsLoading] = useState(true);
   const [hasEncryptedId, setHasEncryptedId] = useState(false);
   const [reVerifyLoading, setReVerifyLoading] = useState(false);
@@ -757,37 +764,13 @@ export function Screen03Vault({
 
   const sans = "var(--font-instrument-sans), system-ui, sans-serif" as const;
 
-  const renderAttributeGrid = (entries: [string, string | boolean][]) =>
-    entries.map(([key, value], idx) => {
-      const label = VAULT_ATTR_LABELS[key] || key;
-      const displayValue = formatVaultAttributeDisplay(key, value);
-      const isVerified = typeof value === "boolean" && value;
-      return (
-        <div
-          key={`${key}-${idx}`}
-          className="flex items-center gap-4 rounded-xl border border-slate-200/90 bg-slate-50/50 px-4 py-3.5 sm:py-4"
-        >
-          <div className="min-w-0 flex-1">
-            <p
-              className="text-[11px] font-medium uppercase tracking-[0.06em] text-slate-500"
-              style={{ fontFamily: sans }}
-            >
-              {label}
-            </p>
-            <p
-              className={`mt-1 text-[15px] font-semibold leading-snug sm:text-[16px] ${
-                isVerified ? "text-emerald-700" : "text-slate-900"
-              }`}
-              style={{ fontFamily: sans }}
-            >
-              {displayValue}
-            </p>
-          </div>
-        </div>
-      );
-    });
-
   function VaultMainSections() {
+    const primaryEntries = sortIdentityEntries(groupedAttributes.identity);
+    const additionalEntries = [
+      ...groupedAttributes.document,
+      ...groupedAttributes.eligibility,
+      ...groupedAttributes.other,
+    ] as [string, string | boolean][];
     return (
       <>
         <div>
@@ -797,97 +780,64 @@ export function Screen03Vault({
           <DokimosHubActionRow actions={hubActions} />
         </div>
 
-        <DokimosSurfaceCard>
-          <div className="flex min-w-0 gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-600 shadow-sm">
-              <Check size={20} className="text-white" strokeWidth={2.5} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[15px] font-semibold text-emerald-800" style={{ fontFamily: sans }}>
-                Identity verified
-              </p>
-              <p className="mt-0.5 text-[13px] text-slate-500" style={{ fontFamily: sans }}>
-                {timestamp}
-              </p>
-              {attestationData?.reVerified ? (
-                <p className="mt-1 text-[12px] font-medium text-emerald-700" style={{ fontFamily: sans }}>
-                  Refreshed from your stored ID (re-verification)
-                </p>
+        <div className="grid gap-8 lg:grid-cols-5 lg:gap-10">
+          <div className="space-y-6 lg:col-span-3">
+            <div className="overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-50/90 to-white px-4 py-4 shadow-sm shadow-emerald-900/[0.06] sm:px-5">
+              <div className="flex min-w-0 gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-600 shadow-sm ring-2 ring-emerald-500/25">
+                  <Check size={20} className="text-white" strokeWidth={2.5} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[15px] font-semibold text-emerald-900" style={{ fontFamily: sans }}>
+                    Identity verified
+                  </p>
+                  <p className="mt-0.5 text-[13px] text-slate-600" style={{ fontFamily: sans }}>
+                    {timestamp}
+                  </p>
+                  {attestationData?.reVerified ? (
+                    <p className="mt-1 text-[12px] font-medium text-emerald-800" style={{ fontFamily: sans }}>
+                      Refreshed from your stored ID (re-verification)
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+
+              {attestationData?.biometricVerification ? (
+                <div
+                  className={`mt-4 flex items-start gap-3 rounded-xl border px-3 py-3 sm:px-4 ${
+                    attestationData.biometricVerification.faceMatch
+                      ? "border-emerald-200/80 bg-white/80"
+                      : "border-amber-200 bg-amber-50/70"
+                  }`}
+                >
+                  {attestationData.biometricVerification.faceMatch ? (
+                    <Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" strokeWidth={2.5} />
+                  ) : (
+                    <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" strokeWidth={2.5} />
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-[14px] font-semibold text-slate-900" style={{ fontFamily: sans }}>
+                      {attestationData.biometricVerification.faceMatch
+                        ? "Face matched to ID"
+                        : "Face match check did not pass"}
+                    </p>
+                    <p className="mt-1 text-[12px] text-slate-600" style={{ fontFamily: sans }}>
+                      Confidence {(attestationData.biometricVerification.confidence * 100).toFixed(1)}%
+                      {attestationData.biometricVerification.error
+                        ? ` — ${attestationData.biometricVerification.error}`
+                        : ""}
+                    </p>
+                  </div>
+                </div>
               ) : null}
             </div>
-          </div>
 
-          {attestationData?.biometricVerification ? (
-            <div
-              className={`mt-6 flex items-start gap-3 rounded-xl border px-4 py-3 ${
-                attestationData.biometricVerification.faceMatch
-                  ? "border-emerald-200 bg-emerald-50/60"
-                  : "border-amber-200 bg-amber-50/70"
-              }`}
-            >
-              {attestationData.biometricVerification.faceMatch ? (
-                <Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" strokeWidth={2.5} />
-              ) : (
-                <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" strokeWidth={2.5} />
-              )}
-              <div className="min-w-0">
-                <p className="text-[14px] font-semibold text-slate-900" style={{ fontFamily: sans }}>
-                  {attestationData.biometricVerification.faceMatch
-                    ? "Face matched to ID"
-                    : "Face match check did not pass"}
-                </p>
-                <p className="mt-1 text-[12px] text-slate-600" style={{ fontFamily: sans }}>
-                  Confidence {(attestationData.biometricVerification.confidence * 100).toFixed(1)}%
-                  {attestationData.biometricVerification.error
-                    ? ` — ${attestationData.biometricVerification.error}`
-                    : ""}
-                </p>
-              </div>
-            </div>
-          ) : null}
-
-          <div className="mt-6 border-t border-slate-100 pt-6">
-            {documentTypeHeading ? (
-              <div className="mb-4">
-                <p
-                  className="text-[11px] font-medium uppercase tracking-[0.06em] text-slate-500"
-                  style={{ fontFamily: sans }}
-                >
-                  Document type
-                </p>
-                <p className="mt-0.5 text-[15px] font-semibold text-slate-900" style={{ fontFamily: sans }}>
-                  {documentTypeHeading}
-                </p>
-              </div>
-            ) : null}
-            <p className="text-[13px] text-slate-500" style={{ fontFamily: sans }}>
-              {cardAttributeEntries.length}{" "}
-              {cardAttributeEntries.length === 1 ? "attribute" : "attributes"} verified
-            </p>
-          </div>
-        </DokimosSurfaceCard>
-
-        <div className="grid gap-8 lg:grid-cols-5 lg:gap-10">
-          <div className="space-y-8 lg:col-span-3">
-            {groupedAttributes.identity.length > 0 ? (
-              <DokimosSection title="Identity" description="What we verified about you.">
-                <div className="grid gap-2 sm:grid-cols-2">{renderAttributeGrid(groupedAttributes.identity)}</div>
-              </DokimosSection>
-            ) : null}
-
-            {(groupedAttributes.document.length > 0 || groupedAttributes.eligibility.length > 0) && (
-              <DokimosSection title="Document & eligibility" description="Document timing and age checks.">
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {renderAttributeGrid([...groupedAttributes.document, ...groupedAttributes.eligibility])}
-                </div>
-              </DokimosSection>
-            )}
-
-            {groupedAttributes.other.length > 0 ? (
-              <DokimosSection title="Additional checks">
-                <div className="grid gap-2 sm:grid-cols-2">{renderAttributeGrid(groupedAttributes.other)}</div>
-              </DokimosSection>
-            ) : null}
+            <VaultCredentialRowList
+              primaryEntries={primaryEntries}
+              documentTypeLabel={documentTypeHeading}
+              additionalEntries={additionalEntries}
+              sans={sans}
+            />
           </div>
 
           <div className="space-y-6 lg:col-span-2">
@@ -1014,7 +964,6 @@ export function Screen03Vault({
         reVerifyError={reVerifyError}
         onReVerify={handleReVerify}
         onReviewRequest={handleReviewRequest}
-        identityVerifiedTime={timestamp}
       />
     );
   }
@@ -1163,21 +1112,6 @@ export function Screen04Share({
     }
   };
 
-  const formatAttributeName = (attr: string) => {
-    const map: Record<string, string> = {
-      ageOver18: "Age Over 18",
-      ageOver21: "Age Over 21",
-      name: "Full Name",
-      dateOfBirth: "Date of Birth",
-      nationality: "Nationality",
-      notExpired: "Document Not Expired",
-      documentType: "Document Type",
-      documentExpiryDate: "Document Expiry Date",
-      address: "Address",
-    };
-    return map[attr] || attr;
-  };
-
   const getRelativeTime = (timestamp: string) => {
     const now = new Date();
     const then = new Date(timestamp);
@@ -1239,7 +1173,7 @@ export function Screen04Share({
           {requestedAttrs.map((attr, idx) => (
             <div key={idx} className="py-3.5 border-b border-gray-100">
               <p className="text-[16px] font-semibold text-gray-900" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
-                {formatAttributeName(attr)}
+                {formatVerificationAttributeKey(attr)}
               </p>
             </div>
           ))}
@@ -1499,40 +1433,6 @@ export function Screen05Receipt({
 
 type ActivityTimeFilter = "all" | "month" | "quarter" | "older";
 
-const COMPANY_BADGE_COLORS = [
-  "#0d9488",
-  "#059669",
-  "#DC2626",
-  "#EA580C",
-  "#7C3AED",
-  "#0891B2",
-  "#DB2777",
-] as const;
-
-function getCompanyBadgeColor(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return COMPANY_BADGE_COLORS[Math.abs(hash) % COMPANY_BADGE_COLORS.length];
-}
-
-/** For approved rows, list attestation attribute keys; otherwise requested attributes. */
-function getDisplayedAttributes(request: VerificationRequest): string[] {
-  if (
-    request.status === "approved" &&
-    request.attestation &&
-    typeof request.attestation === "object"
-  ) {
-    const att = request.attestation as { attributes?: Record<string, unknown> };
-    if (att.attributes && typeof att.attributes === "object") {
-      const keys = Object.keys(att.attributes);
-      if (keys.length > 0) return keys;
-    }
-  }
-  return request.requestedAttributes ?? [];
-}
-
 function requestSortDate(r: VerificationRequest): number {
   const t = r.completedAt || r.createdAt;
   return new Date(t).getTime();
@@ -1627,23 +1527,6 @@ export function Screen06History({
     return formatActivityRelative(ts);
   };
 
-  const formatAttributeName = (attr: string) => {
-    const map: Record<string, string> = {
-      ageOver21: "Age Over 21",
-      ageOver18: "Age Over 18",
-      name: "Full Name",
-      fullName: "Full Name",
-      dateOfBirth: "Date of Birth",
-      nationality: "Nationality",
-      notExpired: "Document not expired",
-      documentNotExpired: "Document not expired",
-      documentType: "Document Type",
-      documentExpiryDate: "Document Expiry Date",
-      address: "Address",
-    };
-    return map[attr] || attr;
-  };
-
   const pendingList = useMemo(
     () =>
       requests
@@ -1672,7 +1555,7 @@ export function Screen06History({
   const renderRequestCard = (request: VerificationRequest) => {
     const initial = (request.verifierName ?? "?").charAt(0).toUpperCase();
     const badgeColor = getCompanyBadgeColor(request.verifierName ?? "");
-    const attrs = getDisplayedAttributes(request);
+    const attrs = getDisplayedAttributeKeys(request);
     const isPending = request.status === "pending";
     const approved = request.status === "approved";
     const denied = request.status === "denied";
@@ -1709,7 +1592,7 @@ export function Screen06History({
                   <XCircle size={14} className="shrink-0 text-gray-400" aria-hidden />
                 )}
                 <span className="text-[13px] text-[#6B7280]" style={{ fontFamily: sans }}>
-                  {formatAttributeName(attr)}
+                  {formatVerificationAttributeKey(attr)}
                 </span>
               </div>
             ))}

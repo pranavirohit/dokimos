@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { useHowItWorksModal } from "@/contexts/HowItWorksModalContext";
 import { Check } from "lucide-react";
 import { DokimosBrandBackdrop } from "@/components/dokimos/DokimosBrandBackdrop";
 import { VaultInfoMenu } from "@/components/dokimos/VaultInfoMenu";
@@ -29,6 +30,8 @@ const heroFade = {
  * Vault home: dark brand canvas + marketing hero + rounded light content sheet.
  */
 export function VaultHomeShell({ verificationUrl, sans, children }: VaultHomeShellProps) {
+  const { openHowItWorks } = useHowItWorksModal();
+
   return (
     <div className="relative w-full min-h-full bg-[#0F172A]">
       <DokimosBrandBackdrop />
@@ -90,13 +93,14 @@ export function VaultHomeShell({ verificationUrl, sans, children }: VaultHomeShe
             >
               View verification activity
             </Link>
-            <Link
-              href="/app/how-it-works"
+            <button
+              type="button"
+              onClick={openHowItWorks}
               className="inline-flex h-12 min-h-[44px] flex-1 items-center justify-center rounded-lg border border-white/30 bg-transparent px-6 text-[15px] font-medium text-white transition-colors hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/50 sm:flex-initial sm:min-w-[200px]"
               style={{ fontFamily: sans }}
             >
               How Dokimos works
-            </Link>
+            </button>
           </motion.div>
         </motion.div>
       </div>

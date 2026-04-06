@@ -16,11 +16,6 @@ module.exports = {
           productCanvas: "#FAFAF9",
           /** Shared core black */
           core: "#1A1A1A",
-          /** Verifier / business dashboard (legacy indigo system) */
-          verifierCanvas: "#F5F5F5",
-          verifierCode: "#F8F9FA",
-          verifierAccent: "#6366F1",
-          verifierAccentHover: "#4F46E5",
           /**
            * Primary accent — teal (Plaid-style marketing + consumer journey).
            */
