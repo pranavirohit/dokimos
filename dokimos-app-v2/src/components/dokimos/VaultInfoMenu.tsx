@@ -10,9 +10,11 @@ const sans = "var(--font-instrument-sans), system-ui, sans-serif" as const;
 type VaultInfoMenuProps = {
   /** Prefer attestation-specific Eigen dashboard URL when present. */
   verificationUrl?: string;
+  /** Light icon for dark vault hero */
+  tone?: "default" | "onDark";
 };
 
-export function VaultInfoMenu({ verificationUrl }: VaultInfoMenuProps) {
+export function VaultInfoMenu({ verificationUrl, tone = "default" }: VaultInfoMenuProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -44,7 +46,11 @@ export function VaultInfoMenu({ verificationUrl }: VaultInfoMenuProps) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="rounded-lg p-2 text-slate-600 transition-colors hover:bg-slate-200/60 hover:text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4F46E5]"
+        className={
+          tone === "onDark"
+            ? "rounded-lg p-2 text-white/85 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40"
+            : "rounded-lg p-2 text-slate-600 transition-colors hover:bg-slate-200/60 hover:text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dokimos-accent"
+        }
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label="Information and help"

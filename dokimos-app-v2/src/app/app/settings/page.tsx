@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { ChevronRight, ExternalLink } from "lucide-react";
 import { useDokimosApp } from "@/contexts/DokimosAppContext";
+import { DokimosPageChrome } from "@/components/dokimos/DokimosPageChrome";
 import { getEigenVerificationDashboardUrl } from "@/lib/eigenUrls";
 
 const sans = "var(--font-instrument-sans), system-ui, sans-serif" as const;
-const serif = "var(--font-instrument-serif), Georgia, serif" as const;
 
 function SettingsLinkRow({
   title,
@@ -25,7 +25,7 @@ function SettingsLinkRow({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200/90 bg-white px-4 py-3 text-left transition-colors hover:border-indigo-200 hover:bg-slate-50/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4F46E5]"
+      className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200/90 bg-white px-4 py-3 text-left transition-colors hover:border-teal-200 hover:bg-slate-50/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dokimos-accent"
       style={{ fontFamily: sans }}
     >
       <div className="min-w-0 flex-1">
@@ -77,15 +77,9 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="px-5 pb-28 pt-4" style={{ fontFamily: sans }}>
-      <h1
-        className="text-[26px] font-semibold tracking-tight text-slate-900"
-        style={{ fontFamily: serif }}
-      >
-        Settings
-      </h1>
-
-      <section className="mt-8">
+    <DokimosPageChrome role="settings" title="Settings" description="Account, vault status, and help.">
+      <div style={{ fontFamily: sans }}>
+      <section className="mt-0">
         <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-wide text-slate-500">
           Account
         </h2>
@@ -97,7 +91,7 @@ export default function SettingsPage() {
           <button
             type="button"
             onClick={() => void handleLogout()}
-            className="mt-4 h-11 w-full rounded-xl border border-slate-200 bg-white text-[15px] font-semibold text-slate-800 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4F46E5]"
+            className="mt-4 h-11 w-full rounded-xl border border-slate-200 bg-white text-[15px] font-semibold text-slate-800 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dokimos-accent"
           >
             Log out
           </button>
@@ -118,7 +112,7 @@ export default function SettingsPage() {
           <button
             type="button"
             onClick={() => window.open(eigenUrl, "_blank", "noopener,noreferrer")}
-            className="mt-4 text-[14px] font-medium text-[#4F46E5] underline decoration-[#4F46E5]/30 underline-offset-4 hover:decoration-[#4F46E5]"
+            className="mt-4 text-[14px] font-medium text-dokimos-accent underline decoration-dokimos-accent/30 underline-offset-4 hover:decoration-dokimos-accent"
           >
             View attestation details →
           </button>
@@ -155,6 +149,7 @@ export default function SettingsPage() {
         </h2>
         <p className="text-[14px] text-slate-600">Version 0.1.0</p>
       </section>
-    </div>
+      </div>
+    </DokimosPageChrome>
   );
 }

@@ -1,11 +1,19 @@
 "use client";
 
 import { HowDokimosProtectsContent } from "@/components/dokimos/HowDokimosProtectsContent";
+import { DokimosPageChrome } from "@/components/dokimos/DokimosPageChrome";
 
 export default function HowItWorksPage() {
   return (
-    <div className="mx-auto max-w-2xl px-4 pb-28 pt-4 sm:px-6 sm:pt-6">
-      <HowDokimosProtectsContent />
-    </div>
+    <DokimosPageChrome
+      role="detail"
+      roleLabel="Help"
+      title="How Dokimos protects you"
+      description="A short walkthrough of verification—from upload to sharing proof on your terms."
+    >
+      <div className="mx-auto max-w-2xl">
+        <HowDokimosProtectsContent omitMainHeading showTechnicalDetailsButton />
+      </div>
+    </DokimosPageChrome>
   );
 }

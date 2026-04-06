@@ -1,68 +1,35 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useSession, signOut } from "next-auth/react";
+import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { signOut } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { useDokimosApp } from "@/contexts/DokimosAppContext";
 import {
-  Screen01A,
-  Screen01B,
-  Screen01C,
   Screen02BLiveness,
-  Screen02Upload,
+  Screen02UploadOrCapture,
   Screen02VerifyProcessing,
 } from "@/components/DokimosFlow";
 
-/** Linear onboarding: intro (0–2) → ID upload (3) → liveness (4) → TEE verify (5). Then `/app/vault`. */
+/**
+ * Linear onboarding: government ID upload → liveness → TEE verify → `/app/vault`.
+ * Optional `?step=0|1|2`. Legacy `?step=3|4|5` from the old 6-step flow maps to 0|1|2.
+ */
 export function OnboardingFlow() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const forceIntro = searchParams.get("intro") === "1";
-  const { status } = useSession();
-  const {
-    setAttestationData,
-    setStoredImageData,
-    markOnboardingComplete,
-  } = useDokimosApp();
+  const stepParam = searchParams.get("step");
+  const { setAttestationData, setStoredImageData, markOnboardingComplete } = useDokimosApp();
 
   const [step, setStep] = useState(0);
 
-  const prevStatusRef = useRef<typeof status | undefined>(undefined);
-  const initialSessionResolvedRef = useRef(false);
-
-  useEffect(() => {
-    const prev = prevStatusRef.current;
-    prevStatusRef.current = status;
-
-    if (status === "loading") return;
-
-    if (!initialSessionResolvedRef.current) {
-      initialSessionResolvedRef.current = true;
-      if (status === "authenticated" && !forceIntro) {
-        setStep((s) => (s < 3 ? 3 : s));
-      }
-      return;
-    }
-
-    if (status === "authenticated" && prev === "unauthenticated" && !forceIntro) {
-      setStep((s) => (s < 3 ? 3 : s));
-    }
-  }, [status, forceIntro]);
-
   const advanceStep = useCallback(() => {
-    setStep((s) => (s < 5 ? s + 1 : s));
+    setStep((s) => (s < 2 ? s + 1 : s));
   }, []);
 
   const goBack = useCallback(() => {
     setStep((s) => (s > 0 ? s - 1 : s));
   }, []);
-
-  useEffect(() => {
-    if (step !== 0 && step !== 1) return;
-    const t = setTimeout(() => advanceStep(), 3500);
-    return () => clearTimeout(t);
-  }, [step, advanceStep]);
 
   const finishVerification = useCallback(() => {
     markOnboardingComplete();
@@ -74,33 +41,46 @@ export function OnboardingFlow() {
     setStep(0);
   };
 
-  let content: React.ReactNode;
+  /** Apply ?step= at most once so advancing the flow cannot be reset by the same URL. */
+  const urlStepAppliedRef = useRef(false);
+  useLayoutEffect(() => {
+    if (urlStepAppliedRef.current) return;
+    if (stepParam == null || stepParam === "") {
+      urlStepAppliedRef.current = true;
+      return;
+    }
+    const n = parseInt(stepParam, 10);
+    if (Number.isNaN(n)) {
+      urlStepAppliedRef.current = true;
+      return;
+    }
+    let mapped: number;
+    if (n >= 0 && n <= 2) mapped = n;
+    else if (n >= 3 && n <= 5) mapped = n - 3;
+    else {
+      urlStepAppliedRef.current = true;
+      return;
+    }
+    urlStepAppliedRef.current = true;
+    setStep(mapped);
+  }, [stepParam]);
+
+  let content: ReactNode;
   switch (step) {
     case 0:
-      content = <Screen01A key="01a" />;
-      break;
-    case 1:
-      content = <Screen01B key="01b" />;
-      break;
-    case 2:
-      content = <Screen01C key="01c" onNext={advanceStep} />;
-      break;
-    case 3:
       content = (
-        <Screen02Upload
+        <Screen02UploadOrCapture
           key="02"
           onNext={advanceStep}
-          onBack={goBack}
+          onBack={() => router.push("/")}
           setStoredImageData={(d) => setStoredImageData(d)}
         />
       );
       break;
-    case 4:
-      content = (
-        <Screen02BLiveness key="02b" onNext={advanceStep} onBack={goBack} />
-      );
+    case 1:
+      content = <Screen02BLiveness key="02b" onNext={advanceStep} onBack={goBack} />;
       break;
-    case 5:
+    case 2:
       content = (
         <Screen02VerifyProcessing
           key="02c"
@@ -122,7 +102,7 @@ export function OnboardingFlow() {
         <div className="pointer-events-none fixed bottom-4 right-4 z-[100] max-w-[calc(100vw-2rem)]">
           <div className="pointer-events-auto flex flex-col gap-2 rounded-xl border border-gray-200 bg-white/95 p-3 text-xs shadow-lg backdrop-blur">
             <div className="text-center font-medium text-gray-600">
-              Onboarding {step + 1} / 6
+              Onboarding {step + 1} / 3
             </div>
             <button
               type="button"
@@ -135,12 +115,12 @@ export function OnboardingFlow() {
             <button
               type="button"
               onClick={() => {
-                if (step < 5) advanceStep();
+                if (step < 2) advanceStep();
                 else finishVerification();
               }}
               className="rounded-lg bg-indigo-500 px-3 py-2 text-white"
             >
-              {step < 5 ? "Next →" : "Finish → app"}
+              {step < 2 ? "Next →" : "Finish → app"}
             </button>
             <button
               type="button"

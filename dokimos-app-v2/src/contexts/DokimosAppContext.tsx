@@ -93,7 +93,9 @@ export function DokimosAppProvider({ children }: { children: ReactNode }) {
       attestationData,
       setAttestationData,
       storedImageData,
+      setStoredImageData,
       selectedRequest,
+      setSelectedRequest,
       markOnboardingComplete,
       isOnboardingComplete,
     ]

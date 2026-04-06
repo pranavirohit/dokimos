@@ -6,8 +6,8 @@ Beautiful **mobile-first** identity verification UI: a **Next.js 14** app that t
 
 | Area | Purpose |
 |------|--------|
-| `src/app/page.tsx` | Home: loads `DokimosFlow` (main 9-screen user journey). |
-| `src/components/DokimosFlow.tsx` | Consumer flow: intro, ID upload, liveness sim, vault, share/receipt, request history. |
+| `src/app/page.tsx` | Home: **marketing landing** (`DokimosLanding`). |
+| `src/components/DokimosFlow.tsx` | Consumer flow: intro, ID upload, liveness sim, vault, share/receipt, request history (used from `/onboarding`, `/app/vault`, etc.). |
 | `src/app/business/page.tsx` | Business / verifier demo dashboard (offline demo data, no login). |
 | `src/app/integration/page.tsx` | Integration / developer-oriented page. |
 | `src/app/api/*` | BFF routes: forward to Fastify (`/verify`, auth, requests, etc.). |
@@ -57,7 +57,9 @@ See `.env.example` for copy-paste templates.
 
 | Path | Audience |
 |------|----------|
-| `/` | **End users** — Dokimos 9-screen flow (phone frame on desktop, full screen on mobile). |
+| `/` | **Marketing** — landing page (Plaid-style hero, product sections). |
+| `/onboarding` | **End users** — start identity onboarding (leads into upload / liveness / vault). |
+| `/app/vault`, `/app/requests`, … | **Signed-in / demo app shell** — vault, activity, settings. |
 | `/business` | Business verifier dashboard demo (Overview, Verifications, Programs). |
 | `/integration` | Integration / product docs style page. |
 
@@ -78,12 +80,12 @@ Client code calls **same-origin** `/api/...`; route handlers use `TEE_ENDPOINT` 
 
 ## User flow (high level)
 
-1. **Screens 0–2** — Intro / marketing animation (auto-advance on early screens).
-2. **Google sign-in** — Optional; authenticated users skip intro and land on upload.
-3. **Upload → liveness (simulated) → vault** — `POST /api/verify` to the TEE.
-4. **Share / receipt / history** — Pending requests from `GET /api/requests/user/...`; approve/deny via `POST /api/approve-request`.
+1. **`/`** — Marketing landing; CTAs go to **`/onboarding`** (individuals) or **`/business`** (verifier demo).
+2. **Onboarding (`/onboarding`)** — Linear flow: intro screens → upload → liveness → TEE verify → **`/app/vault`**.
+3. **Google sign-in** — Optional; authenticated users may skip parts of intro depending on session.
+4. **Vault / requests** — `POST /api/verify` to the TEE; pending requests from `GET /api/requests/user/...`; approve/deny via `POST /api/approve-request`.
 
-On **desktop**, the UI is shown inside a fixed **phone-sized frame** with optional dev back/next controls; on **real mobile** it is full viewport.
+Some **DokimosFlow** screens still use a **phone-sized frame** on desktop in certain paths; the **app shell** under `/app/*` is full-width responsive.
 
 ## Deploy (e.g. Vercel)
 

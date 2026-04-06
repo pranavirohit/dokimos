@@ -73,7 +73,7 @@ export function HowDokimosProtectsContent({
             className="flex w-full max-w-md gap-3 rounded-xl border border-slate-200/80 bg-slate-50/80 p-4"
           >
             <div
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#4F46E5] text-[14px] font-semibold text-white"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-dokimos-accent text-[14px] font-semibold text-white"
               aria-hidden
             >
               {step.n}
@@ -149,7 +149,7 @@ export function HowDokimosProtectsContent({
           <button
             type="button"
             onClick={() => window.open(eigenUrl, "_blank", "noopener,noreferrer")}
-            className="mt-2 inline-flex items-center gap-2 rounded-xl bg-[#4F46E5] px-4 py-2.5 text-[14px] font-semibold text-white shadow-sm transition-colors hover:bg-[#4338CA] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+            className="mt-2 inline-flex items-center gap-2 rounded-xl bg-dokimos-accent px-4 py-2.5 text-[14px] font-semibold text-white shadow-sm transition-colors hover:bg-dokimos-accentHover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dokimos-accent"
           >
             View technical details
             <ExternalLink size={16} aria-hidden />

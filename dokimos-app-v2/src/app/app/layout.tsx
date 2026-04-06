@@ -1,18 +1,12 @@
 "use client";
 
-import { Suspense, useMemo } from "react";
-import { usePathname } from "next/navigation";
+import { Suspense } from "react";
 import { AppShellLayout } from "@/components/dokimos/AppShellLayout";
 import { RequestNotificationsProvider } from "@/contexts/RequestNotificationsContext";
 import { AppRouteGuard } from "./AppRouteGuard";
 
 function AppShellWithTabs({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname() || "";
-  const hideTabBar = useMemo(
-    () => pathname.includes("/review") || pathname.includes("/receipt"),
-    [pathname]
-  );
-  return <AppShellLayout hideTabBar={hideTabBar}>{children}</AppShellLayout>;
+  return <AppShellLayout>{children}</AppShellLayout>;
 }
 
 export default function AppGroupLayout({

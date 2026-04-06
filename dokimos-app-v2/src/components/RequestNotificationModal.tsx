@@ -81,7 +81,7 @@ export function RequestNotificationModal({
 
         <div className="flex flex-col items-center gap-3 pb-4">
           <div
-            className="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-full bg-[#4F46E5] text-[24px] font-semibold text-white shadow-sm"
+            className="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-full bg-dokimos-accent text-[24px] font-semibold text-white shadow-sm"
             style={{ fontFamily: sans }}
             aria-hidden
           >
@@ -122,7 +122,7 @@ export function RequestNotificationModal({
                   className="flex items-start gap-2 text-[14px] text-slate-900"
                   style={{ fontFamily: sans }}
                 >
-                  <span className="mt-0.5 font-bold text-[#4F46E5]" aria-hidden>
+                  <span className="mt-0.5 font-bold text-dokimos-accent" aria-hidden>
                     •
                   </span>
                   <span>{formatRequestAttributeName(attr)}</span>

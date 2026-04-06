@@ -317,7 +317,7 @@ export function VerifierDashboard() {
       {/* Tab Navigation */}
       <div className="border-b border-gray-200 bg-white/80">
         <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 xl:px-12">
-          <div className="flex w-full min-w-0 flex-wrap gap-6 sm:gap-8">
+          <div className="flex w-full min-w-0 flex-wrap justify-end gap-6 sm:gap-8">
             {[
               { id: 'overview', label: 'Overview' },
               { id: 'verifications', label: 'Verifications' },

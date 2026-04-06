@@ -79,7 +79,7 @@ export function ExplainerModal({ isOpen, onClose }: ExplainerModalProps) {
         <button
           type="button"
           onClick={handleGotIt}
-          className="mt-6 h-12 w-full rounded-xl bg-[#4F46E5] text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-[#4338CA] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          className="mt-6 h-12 w-full rounded-xl bg-dokimos-accent text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-dokimos-accentHover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dokimos-accent"
           style={{ fontFamily: sans }}
         >
           Got it

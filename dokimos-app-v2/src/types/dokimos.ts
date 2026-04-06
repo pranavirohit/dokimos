@@ -47,6 +47,9 @@ export const STORAGE_HAS_ENCRYPTED_ID = "dokimos_has_encrypted_id";
 /** Post-verification explainer modal (“How Dokimos protects your identity”); show once per browser profile. */
 export const STORAGE_EXPLAINER_SEEN = "dokimos_explainer_seen";
 
+/** First vault visit after onboarding — “What just happened?” modal; show once per browser profile. */
+export const STORAGE_POST_VERIFICATION_EXPLAINER_SEEN = "dokimos_post_verification_explainer_seen";
+
 /** Live selfie JPEG (data URL) for POST /verify face match — cleared after success. */
 export const STORAGE_LIVE_PHOTO = "dokimos_live_photo";
 

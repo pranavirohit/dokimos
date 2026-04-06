@@ -9,9 +9,15 @@
   --dokimos-bg-primary: #ffffff;
   --dokimos-bg-secondary: #f9fafb;
   --dokimos-bg-tertiary: #f3f4f6;
+  --dokimos-product-canvas: #fafaf9;
   --dokimos-text-primary: #1a1a1a;
   --dokimos-text-secondary: #666666;
   --dokimos-text-tertiary: #999999;
+  /** Product accent (teal) — buttons, tabs, links in /app + onboarding */
+  --dokimos-accent: #0d9488;
+  --dokimos-accent-hover: #0f766e;
+  --dokimos-accent-pressed: #115e59;
+  --dokimos-accent-soft: #f0fdfa;
   --dokimos-accent-success: #059669;
   --dokimos-accent-primary: #1a1a1a;
   --dokimos-border-subtle: #e5e7eb;

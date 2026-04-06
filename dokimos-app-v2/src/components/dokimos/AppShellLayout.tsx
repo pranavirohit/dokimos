@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Shield, Activity, Settings } from "lucide-react";
 import { usePendingRequestCount } from "@/contexts/RequestNotificationsContext";
+import { dokimosCanvasClass } from "@/lib/dokimosLayout";
 import type { DokimosAppTab } from "@/types/dokimos";
 
 type AppShellLayoutProps = {
@@ -29,8 +30,8 @@ function tabFromPath(pathname: string): DokimosAppTab {
 }
 
 const tabClass = (active: boolean) =>
-  `flex min-h-[56px] min-w-[72px] flex-col items-center justify-center gap-1 rounded-lg px-3 py-1 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4F46E5] ${
-    active ? "text-[#4F46E5]" : "text-[#6B7280] hover:text-gray-900"
+  `flex min-h-[56px] min-w-[72px] flex-col items-center justify-center gap-1 rounded-lg px-3 py-1 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dokimos-accent ${
+    active ? "text-dokimos-accent" : "text-slate-500 hover:text-slate-900"
   }`;
 
 export function AppShellLayout({
@@ -43,18 +44,26 @@ export function AppShellLayout({
   const pendingRequestCount = usePendingRequestCount();
   const sans = "var(--font-instrument-sans), system-ui, sans-serif";
 
+  /** Split dashboard (`/app/vault`) needs full viewport width; other hub screens stay in a readable column. */
+  const fullWidthAppShell = pathname.startsWith("/app/vault");
+  const mainWidthClass = fullWidthAppShell
+    ? "w-full max-w-none"
+    : "max-w-[600px] lg:max-w-5xl";
+
   return (
-    <div className="relative flex min-h-[100dvh] w-full flex-col bg-white pt-[env(safe-area-inset-top)]">
+    <div
+      className={`relative flex min-h-[100dvh] w-full flex-col pt-[env(safe-area-inset-top)] ${dokimosCanvasClass}`}
+    >
       {topBar}
-      <div className="mx-auto flex min-h-0 w-full max-w-[600px] flex-1 flex-col overflow-hidden lg:max-w-3xl">
+      <div className={`mx-auto flex min-h-0 w-full flex-1 flex-col overflow-hidden ${mainWidthClass}`}>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">{children}</div>
       </div>
       {!hideTabBar && (
         <nav
-          className="h-14 w-full shrink-0 border-t border-[#F3F4F6] bg-white pb-[env(safe-area-inset-bottom)] pt-2"
+          className="h-14 w-full shrink-0 border-t border-slate-200/80 bg-white/95 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur-sm lg:hidden"
           aria-label="Main"
         >
-          <div className="mx-auto flex h-full max-w-[600px] items-end justify-around px-1 lg:max-w-3xl">
+          <div className="mx-auto flex h-full max-w-[600px] items-end justify-around px-1 lg:max-w-5xl">
               <Link
                 href="/app/vault"
                 aria-current={activeTab === "vault" ? "page" : undefined}
@@ -62,7 +71,7 @@ export function AppShellLayout({
                 style={{ fontFamily: sans }}
               >
                 <span
-                  className={`mb-0.5 block h-1 w-1 rounded-full ${activeTab === "vault" ? "bg-[#4F46E5]" : "bg-transparent"}`}
+                  className={`mb-0.5 block h-1 w-1 rounded-full ${activeTab === "vault" ? "bg-dokimos-accent" : "bg-transparent"}`}
                   aria-hidden
                 />
                 <Shield size={20} strokeWidth={activeTab === "vault" ? 2.5 : 2} aria-hidden />
@@ -75,7 +84,7 @@ export function AppShellLayout({
                 style={{ fontFamily: sans }}
               >
                 <span
-                  className={`mb-0.5 block h-1 w-1 rounded-full ${activeTab === "activity" ? "bg-[#4F46E5]" : "bg-transparent"}`}
+                  className={`mb-0.5 block h-1 w-1 rounded-full ${activeTab === "activity" ? "bg-dokimos-accent" : "bg-transparent"}`}
                   aria-hidden
                 />
                 <span className="relative inline-flex">
@@ -98,7 +107,7 @@ export function AppShellLayout({
                 style={{ fontFamily: sans }}
               >
                 <span
-                  className={`mb-0.5 block h-1 w-1 rounded-full ${activeTab === "settings" ? "bg-[#4F46E5]" : "bg-transparent"}`}
+                  className={`mb-0.5 block h-1 w-1 rounded-full ${activeTab === "settings" ? "bg-dokimos-accent" : "bg-transparent"}`}
                   aria-hidden
                 />
                 <Settings size={20} strokeWidth={activeTab === "settings" ? 2.5 : 2} aria-hidden />

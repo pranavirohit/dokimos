@@ -1,0 +1,68 @@
+/** Demo / fallback attributes when no attestation is loaded — kept in sync with TEE shape. */
+export const VAULT_DEMO_ATTRIBUTES: Record<string, string | boolean> = {
+  name: "Test User",
+  dateOfBirth: "1990-01-15",
+  ageOver18: true,
+  ageOver21: true,
+  notExpired: true,
+  nationality: "United States",
+  documentType: "Driver's License",
+  documentExpiryDate: "2030-12-31",
+};
+
+export function formatVaultAttributeDisplay(key: string, value: string | boolean): string {
+  if (typeof value === "boolean") {
+    return value ? "Verified" : "Not verified";
+  }
+  const s = String(value);
+  if (s === "Unknown") return "—";
+  if (key === "dateOfBirth" || key === "documentExpiryDate") {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s.trim());
+    const d = m
+      ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+      : new Date(s);
+    if (!Number.isNaN(d.getTime())) {
+      if (key === "documentExpiryDate") {
+        return `Expires ${d.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })}`;
+      }
+      return d.toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
+  }
+  return s;
+}
+
+const VAULT_IDENTITY_KEYS = new Set(["name", "dateOfBirth", "nationality"]);
+const VAULT_DOCUMENT_KEYS = new Set(["documentExpiryDate", "notExpired"]);
+const VAULT_ELIGIBILITY_KEYS = new Set(["ageOver18", "ageOver21"]);
+
+export function groupVaultAttributes(entries: [string, string | boolean][]) {
+  const identity: [string, string | boolean][] = [];
+  const documentG: [string, string | boolean][] = [];
+  const eligibility: [string, string | boolean][] = [];
+  const other: [string, string | boolean][] = [];
+  for (const [k, v] of entries) {
+    if (VAULT_IDENTITY_KEYS.has(k)) identity.push([k, v]);
+    else if (VAULT_DOCUMENT_KEYS.has(k)) documentG.push([k, v]);
+    else if (VAULT_ELIGIBILITY_KEYS.has(k)) eligibility.push([k, v]);
+    else other.push([k, v]);
+  }
+  return { identity, document: documentG, eligibility, other };
+}
+
+export const VAULT_ATTR_LABELS: Record<string, string> = {
+  name: "Full name",
+  dateOfBirth: "Date of birth",
+  ageOver18: "Age over 18",
+  ageOver21: "Age over 21",
+  notExpired: "Document expiry",
+  nationality: "Nationality",
+  documentExpiryDate: "Document expiry date",
+};
