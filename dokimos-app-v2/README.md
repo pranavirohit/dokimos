@@ -37,15 +37,13 @@ cd ..   # dokimos-tee root
 npm run dev
 ```
 
-Default TEE URL: **http://localhost:8080** (`PORT` in Fastify, see `src/index.ts` in the root).
-
-Copy `.env.example` → `.env.local` and set `TEE_ENDPOINT` to match your running Fastify instance.
+Default TEE URL (when `TEE_ENDPOINT` is unset): **deployed EigenCloud / Intel TDX** — see `src/lib/teeEndpoint.ts` (`DEFAULT_TEE_ENDPOINT`). For **local** Fastify, copy `.env.example` → `.env.local` and set `TEE_ENDPOINT=http://localhost:8080` (or whatever port your root `npm run dev` uses).
 
 ## Environment variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `TEE_ENDPOINT` | Yes (for real flows) | Base URL of the Fastify backend (e.g. `http://localhost:8080`). |
+| `TEE_ENDPOINT` | Optional | Overrides default deployed TEE; use `http://localhost:8080` (or `:8081`) for local Fastify. |
 | `NEXTAUTH_URL` | Production | Public URL of this Next app (e.g. `http://localhost:8081` locally). |
 | `NEXTAUTH_SECRET` | Production | Secret for NextAuth session encryption. |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | For Google sign-in | OAuth credentials from Google Cloud Console. |

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import axios from "axios";
 import { axiosErrorResponse, logApiError } from "@/lib/safeLog";
+import { getTeeEndpoint } from "@/lib/teeEndpoint";
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,7 +15,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const TEE_ENDPOINT = process.env.TEE_ENDPOINT || "http://localhost:8080";
+    const TEE_ENDPOINT = getTeeEndpoint();
 
     const response = await axios.post(
       `${TEE_ENDPOINT}/api/request-verification`,

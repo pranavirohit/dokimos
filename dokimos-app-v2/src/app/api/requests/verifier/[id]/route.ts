@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import axios from "axios";
 import { axiosErrorResponse, logApiError } from "@/lib/safeLog";
+import { getTeeEndpoint } from "@/lib/teeEndpoint";
 
 export async function GET(
   _request: NextRequest,
@@ -16,7 +17,7 @@ export async function GET(
       );
     }
 
-    const TEE_ENDPOINT = process.env.TEE_ENDPOINT || "http://localhost:8080";
+    const TEE_ENDPOINT = getTeeEndpoint();
 
     const response = await axios.get(
       `${TEE_ENDPOINT}/api/requests/verifier/${encodeURIComponent(id)}`,

@@ -15,4 +15,5 @@ COPY tsconfig.json ./
 
 EXPOSE 8080
 
-CMD ["npx", "ts-node", "src/index.ts"]
+# ts-node + Node ESM fails to resolve extensionless ./faceVerification; tsx matches package.json "start"
+CMD ["npx", "tsx", "src/index.ts"]

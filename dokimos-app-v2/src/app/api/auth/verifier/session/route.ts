@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import axios from "axios";
 import { cookies } from "next/headers";
+import { getTeeEndpoint } from "@/lib/teeEndpoint";
 
 const COOKIE_NAME = "dokimos_verifier_session";
 
@@ -12,7 +13,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const TEE_ENDPOINT = process.env.TEE_ENDPOINT || "http://localhost:8080";
+  const TEE_ENDPOINT = getTeeEndpoint();
 
   try {
     const response = await axios.get(

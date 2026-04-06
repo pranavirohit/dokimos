@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import axios from "axios";
 import { z } from "zod";
 import { axiosErrorResponse, logApiError } from "@/lib/safeLog";
+import { getTeeEndpoint } from "@/lib/teeEndpoint";
 
 const loginSchema = z.object({
   email: z.string().email().max(255),
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
     }
     const { email, password } = parsed.data;
 
-    const TEE_ENDPOINT = process.env.TEE_ENDPOINT || "http://localhost:8080";
+    const TEE_ENDPOINT = getTeeEndpoint();
 
     const response = await axios.post(
       `${TEE_ENDPOINT}/api/auth/verifier/login`,

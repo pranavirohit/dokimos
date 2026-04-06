@@ -1,6 +1,7 @@
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
+import { getTeeEndpoint } from "@/lib/teeEndpoint";
 
 const isProd = process.env.NODE_ENV === "production";
 
@@ -9,8 +10,6 @@ const googleClientId =
   (isProd ? "" : "dev-placeholder-not-a-real-client-id.apps.googleusercontent.com");
 const googleClientSecret =
   process.env.GOOGLE_CLIENT_SECRET || (isProd ? "" : "dev-placeholder-not-a-real-secret");
-
-const teeEndpoint = process.env.TEE_ENDPOINT || "http://localhost:8080";
 
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
@@ -24,8 +23,10 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
+        const teeEndpoint = getTeeEndpoint();
         try {
-          const res = await fetch(`${teeEndpoint}/api/auth/user/login`, {
+          const loginUrl = `${teeEndpoint}/api/auth/user/login`;
+          const res = await fetch(loginUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -63,6 +64,7 @@ export const authOptions: NextAuthOptions = {
         return true;
       }
       try {
+        const teeEndpoint = getTeeEndpoint();
         const response = await fetch(`${teeEndpoint}/api/auth/user/signup`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },

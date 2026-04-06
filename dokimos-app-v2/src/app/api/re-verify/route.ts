@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import axios from "axios";
 import { authOptions } from "@/lib/authOptions";
 import { logApiError } from "@/lib/safeLog";
+import { getTeeEndpoint } from "@/lib/teeEndpoint";
 
 export async function POST(_request: NextRequest) {
   try {
@@ -15,7 +16,7 @@ export async function POST(_request: NextRequest) {
       );
     }
 
-    const TEE_ENDPOINT = process.env.TEE_ENDPOINT || "http://localhost:8080";
+    const TEE_ENDPOINT = getTeeEndpoint();
 
     const response = await axios.post(
       `${TEE_ENDPOINT}/re-verify`,

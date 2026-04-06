@@ -17,7 +17,7 @@ import {
 
 dotenv.config();
 
-/** Inlined here so Docker/ts-node only needs index.ts (avoids missing-module issues on deploy). */
+/** Default Eigen app id embedded in attestation responses. */
 const DEFAULT_EIGEN_APP_ID =
   '0x00658e70d8880910277592b3b41f9dd3fe4ce5fd';
 
@@ -1458,84 +1458,91 @@ async function main() {
 
   // Endpoint that verifies ID documents and returns signed attestations
   server.post('/verify', verifyRouteConfig, async (request, reply) => {
-    const parsed = verifyBodySchema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply
-        .code(400)
-        .send({ error: 'Invalid input', details: parsed.error.flatten() });
-    }
-    const { imageBase64, livePhotoBase64, requestedAttributes, userId } =
-      parsed.data;
-
-    let allAttributes: ExtractedAttributes;
     try {
-      allAttributes = await extractAttributesFromDocument(imageBase64);
-    } catch (e: unknown) {
-      const code =
-        e &&
-        typeof e === 'object' &&
-        'statusCode' in e &&
-        typeof (e as { statusCode?: number }).statusCode === 'number'
-          ? (e as { statusCode: number }).statusCode
-          : 500;
-      const msg = e instanceof Error ? e.message : 'Invalid image data';
-      return reply.code(code).send({ error: msg });
-    }
-
-    let faceMatch: FaceMatchResult | null = null;
-    if (livePhotoBase64) {
-      const liveOk = validateImageBase64(livePhotoBase64);
-      if (!liveOk.ok) {
+      const parsed = verifyBodySchema.safeParse(request.body);
+      if (!parsed.success) {
         return reply
           .code(400)
-          .send({ error: liveOk.message || 'Invalid live photo' });
+          .send({ error: 'Invalid input', details: parsed.error.flatten() });
       }
-      const engineOk = await ensureFaceEngine();
-      if (!engineOk) {
-        faceMatch = {
-          match: false,
-          confidence: 0,
-          error: 'Face engine unavailable',
-        };
-      } else {
-        const idCrop = await extractIdPhoto(imageBase64);
-        if (!idCrop) {
+      const { imageBase64, livePhotoBase64, requestedAttributes, userId } =
+        parsed.data;
+
+      let allAttributes: ExtractedAttributes;
+      try {
+        allAttributes = await extractAttributesFromDocument(imageBase64);
+      } catch (e: unknown) {
+        const code =
+          e &&
+          typeof e === 'object' &&
+          'statusCode' in e &&
+          typeof (e as { statusCode?: number }).statusCode === 'number'
+            ? (e as { statusCode: number }).statusCode
+            : 500;
+        const msg = e instanceof Error ? e.message : 'Invalid image data';
+        return reply.code(code).send({ error: msg });
+      }
+
+      let faceMatch: FaceMatchResult | null = null;
+      if (livePhotoBase64) {
+        const liveOk = validateImageBase64(livePhotoBase64);
+        if (!liveOk.ok) {
+          return reply
+            .code(400)
+            .send({ error: liveOk.message || 'Invalid live photo' });
+        }
+        const engineOk = await ensureFaceEngine();
+        if (!engineOk) {
           faceMatch = {
             match: false,
             confidence: 0,
-            error: 'Could not extract portrait region from ID image',
+            error: 'Face engine unavailable',
           };
         } else {
-          faceMatch = await compareFaces(idCrop, livePhotoBase64);
+          const idCrop = await extractIdPhoto(imageBase64);
+          if (!idCrop) {
+            faceMatch = {
+              match: false,
+              confidence: 0,
+              error: 'Could not extract portrait region from ID image',
+            };
+          } else {
+            faceMatch = await compareFaces(idCrop, livePhotoBase64);
+          }
         }
       }
-    }
 
-    const response = await buildSignedAttestationResponse(
-      allAttributes,
-      requestedAttributes,
-      faceMatch
-    );
+      const response = await buildSignedAttestationResponse(
+        allAttributes,
+        requestedAttributes,
+        faceMatch
+      );
 
-    let encryptedIdStored = false;
-    if (userId) {
-      const validated = validateImageBase64(imageBase64);
-      if (validated.ok) {
-        try {
-          const imageBuffer = Buffer.from(validated.stripped, 'base64');
-          const enc = encryptIdImagePoc(imageBuffer, userId);
-          encryptedIdStore.set(normalizeUserKey(userId), enc);
-          encryptedIdStored = true;
-        } catch (err) {
-          server.log.warn({ err }, 'Failed to encrypt/store ID image (POC)');
+      let encryptedIdStored = false;
+      if (userId) {
+        const validated = validateImageBase64(imageBase64);
+        if (validated.ok) {
+          try {
+            const imageBuffer = Buffer.from(validated.stripped, 'base64');
+            const enc = encryptIdImagePoc(imageBuffer, userId);
+            encryptedIdStore.set(normalizeUserKey(userId), enc);
+            encryptedIdStored = true;
+          } catch (err) {
+            server.log.warn({ err }, 'Failed to encrypt/store ID image (POC)');
+          }
         }
       }
-    }
 
-    return {
-      ...response,
-      encryptedIdStored,
-    };
+      return {
+        ...response,
+        encryptedIdStored,
+      };
+    } catch (err: unknown) {
+      server.log.error(err);
+      return reply
+        .code(500)
+        .send({ error: 'Verification failed. Please try again.' });
+    }
   });
 
   const reverifyRouteConfig = {

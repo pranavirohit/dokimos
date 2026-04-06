@@ -1,0 +1,14 @@
+---
+description: Single source of truth for Dokimos UI — Next app location and what to ignore
+alwaysApply: true
+---
+
+# Dokimos frontend (canonical)
+
+- **The only supported Next.js app is `dokimos-app-v2/`.** Run `npm run dev` from that folder (port **8081**). Use **`src/app/`** (App Router), **`src/components/`**, Tailwind in **`src/app/globals.css`**, and **`tailwind.config.js`** at `dokimos-app-v2/`.
+- **Do not treat these as the product UI** unless the task explicitly says “legacy” or “prototype”:
+  - Repository root **`app/`**, **`DokimosFlow.tsx`** at repo root, and root **`next.config.js`** / **`tailwind.config.js`** — leftover prototype layout; root **`package.json` has no `next`** dependency.
+  - **`dokimos-app/`** — older Next app; prefer **`dokimos-app-v2`** for new work.
+- **Prefer React + Tailwind utility classes** in TSX under `dokimos-app-v2/src/`. Avoid introducing parallel **raw HTML files** or **duplicate `layout.tsx`** outside `dokimos-app-v2/src/app/` for the same feature.
+- **Marketing home** is `dokimos-app-v2/src/app/page.tsx` → `DokimosLanding`. The multi-screen consumer flow lives in **`dokimos-app-v2/src/components/DokimosFlow.tsx`** and is reached from **`/onboarding`**, **`/app/*`**, etc., not from `/` alone.
+- **Product UI accent (teal, Plaid-aligned):** use Tailwind **`dokimos-accent`**, **`dokimos-accentHover`**, **`dokimos-accentPressed`**, **`dokimos-productCanvas`**, **`dokimos-accentSoft`** from `tailwind.config.js`, or shared classes in **`src/lib/dokimosLayout.ts`**. Do not reintroduce **`#4F46E5`** for consumer flows; **`verifierAccent`** remains for **`/business`** verifier theme if needed.

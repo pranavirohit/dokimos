@@ -7,7 +7,7 @@ export function logApiError(context: string, error: unknown): void {
 }
 
 const UNREACHABLE =
-  "Cannot reach the verification server. Start the TEE backend from the repo root (npm run dev) and ensure dokimos-app-v2 TEE_ENDPOINT matches its port (default 8080).";
+  "Cannot reach the verification server. Check network access to TEE_ENDPOINT (default: deployed EigenCloud). For a local Fastify instance, set TEE_ENDPOINT in dokimos-app-v2/.env.local (e.g. http://localhost:8080).";
 
 /** Safe client response from an axios proxy error (does not log response bodies). */
 export function axiosErrorResponse(
