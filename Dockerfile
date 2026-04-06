@@ -4,6 +4,9 @@ USER root
 
 WORKDIR /app
 
+# canvas (node-canvas) native build: Python + toolchain + Cairo stack headers/libs
+RUN apk add --no-cache python3 make g++ cairo-dev jpeg-dev pango-dev giflib-dev
+
 COPY package.json ./
 RUN npm install
 
