@@ -207,6 +207,12 @@ const userLoginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1).max(128),
 });
+
+/** Map keys for `users` — must match signup, login, and request lookups. */
+function normalizeConsumerEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
 const verifierSignupSchema = z.object({
   companyName: z.string().min(1).max(200),
   email: emailSchema,
@@ -1117,7 +1123,8 @@ async function main() {
           .code(400)
           .send({ error: 'Invalid input', details: parsed.error.flatten() });
       }
-      const { name, email, password } = parsed.data;
+      const { name, password } = parsed.data;
+      const email = normalizeConsumerEmail(parsed.data.email);
 
       if (users.has(email)) {
         return reply.code(400).send({ error: 'User already exists' });
@@ -1149,11 +1156,14 @@ async function main() {
           .code(400)
           .send({ error: 'Invalid input', details: parsed.error.flatten() });
       }
-      const { email, password } = parsed.data;
+      const { password } = parsed.data;
+      const email = normalizeConsumerEmail(parsed.data.email);
 
       const user = users.get(email);
-      const valid =
-        user && (await bcrypt.compare(password, user.passwordHash));
+      const passwordMatches = user
+        ? await bcrypt.compare(password, user.passwordHash)
+        : false;
+      const valid = Boolean(user && passwordMatches);
       if (!valid) {
         return reply.code(401).send({ error: 'Invalid credentials' });
       }
@@ -1288,8 +1298,8 @@ async function main() {
         .code(400)
         .send({ error: 'Invalid input', details: parsed.error.flatten() });
     }
-    const { verifierId, userEmail, requestedAttributes, workflow } =
-      parsed.data;
+    const { verifierId, requestedAttributes, workflow } = parsed.data;
+    const userEmail = normalizeConsumerEmail(parsed.data.userEmail);
 
     let verifier: Verifier | undefined;
     for (const v of verifiers.values()) {
@@ -1329,10 +1339,10 @@ async function main() {
 
   // Get requests for a specific user
   server.get<{ Params: { userEmail: string } }>('/api/requests/user/:userEmail', async (request, reply) => {
-    const { userEmail } = request.params;
+    const userEmail = normalizeConsumerEmail(request.params.userEmail);
 
     const userRequests = Array.from(requests.values()).filter(
-      req => req.userEmail === userEmail
+      (req) => normalizeConsumerEmail(req.userEmail) === userEmail
     );
 
     return userRequests;

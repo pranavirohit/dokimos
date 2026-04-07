@@ -14,8 +14,7 @@ export function LandingNav() {
     <header className="pointer-events-none fixed left-0 right-0 top-0 z-[100] pt-6">
       <div className="pointer-events-auto mx-auto w-full max-w-[min(100%-2rem,1160px)] px-5 sm:px-8 lg:px-10">
         <div
-          className="flex items-center justify-between rounded-[40px] border border-white/50 bg-[hsla(0,0%,100%,0.55)] px-4 py-0 shadow-[0_8px_40px_rgba(71,85,105,0.1),0_4px_16px_rgba(13,148,136,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-[20px] sm:px-6 lg:h-[71px] lg:pl-6 lg:pr-[18px]"
-          style={{ WebkitBackdropFilter: "blur(20px)" }}
+          className="flex items-center justify-between rounded-[40px] border border-white/50 bg-[hsla(0,0%,100%,0.82)] px-4 py-0 shadow-[0_8px_40px_rgba(71,85,105,0.1),0_4px_16px_rgba(13,148,136,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur-md sm:px-6 lg:h-[71px] lg:pl-6 lg:pr-[18px]"
         >
           <Link
             href="/"
@@ -55,7 +54,7 @@ export function LandingNav() {
               Contact
             </Link>
             <Link
-              href="/onboarding"
+              href="/login?callbackUrl=/onboarding"
               className="inline-flex h-10 items-center gap-1.5 rounded-full bg-gradient-to-br from-teal-400 via-teal-500 to-teal-700 px-5 text-[14px] font-semibold text-white shadow-[0_8px_28px_rgba(13,148,136,0.32),inset_0_1px_0_rgba(255,255,255,0.22)] transition-[transform,box-shadow,filter] hover:-translate-y-px hover:shadow-[0_10px_32px_rgba(13,148,136,0.4)] lg:h-[39px] lg:px-6 lg:text-[16px]"
             >
               For Individuals

@@ -20,7 +20,7 @@ export function DokimosLanding() {
   return (
     <div
       id="main-content"
-      className="font-landing relative min-h-[100dvh] overflow-x-hidden text-slate-800"
+      className="font-landing relative isolate min-h-[100dvh] overflow-x-hidden text-slate-800"
     >
       {/* Base: smooth stone/zinc (full-bleed, calm) */}
       <div
@@ -53,7 +53,7 @@ export function DokimosLanding() {
             </p>
             <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
               <Link
-                href="/onboarding"
+                href="/login?callbackUrl=/onboarding"
                 className="inline-flex h-12 min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-teal-400 via-teal-500 to-teal-700 px-8 text-[16px] font-semibold text-white shadow-[0_8px_32px_rgba(13,148,136,0.35),0_4px_12px_rgba(15,118,110,0.25),inset_0_1px_0_rgba(255,255,255,0.25)] transition-[transform,box-shadow,filter] hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(13,148,136,0.42),0_6px_16px_rgba(15,118,110,0.3)] active:translate-y-0"
               >
                 For Individuals
@@ -312,7 +312,7 @@ function LandingFooter() {
             </p>
             <ul className="space-y-2 text-slate-800">
               <li>
-                <Link href="/onboarding" className="hover:underline">
+                <Link href="/login?callbackUrl=/onboarding" className="hover:underline">
                   For Individuals
                 </Link>
               </li>
