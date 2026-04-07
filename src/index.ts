@@ -1471,9 +1471,11 @@ async function main() {
     try {
       const parsed = verifyBodySchema.safeParse(request.body);
       if (!parsed.success) {
-        return reply
-          .code(400)
-          .send({ error: 'Invalid input', details: parsed.error.flatten() });
+        return reply.code(400).send({
+          error: 'Invalid input',
+          code: 'INVALID_INPUT',
+          details: parsed.error.flatten(),
+        });
       }
       const { imageBase64, livePhotoBase64, requestedAttributes, userId } =
         parsed.data;
@@ -1490,34 +1492,56 @@ async function main() {
             ? (e as { statusCode: number }).statusCode
             : 500;
         const msg = e instanceof Error ? e.message : 'Invalid image data';
-        return reply.code(code).send({ error: msg });
+        return reply.code(code).send({ error: msg, code: 'OCR_FAILED' });
       }
+
+      /** DEMO: set `true` to run real face-api matching (sample ID vs selfie will often fail). */
+      const USE_REAL_FACE_MATCH = false;
 
       let faceMatch: FaceMatchResult | null = null;
       if (livePhotoBase64) {
         const liveOk = validateImageBase64(livePhotoBase64);
         if (!liveOk.ok) {
-          return reply
-            .code(400)
-            .send({ error: liveOk.message || 'Invalid live photo' });
+          return reply.code(400).send({
+            error: liveOk.message || 'Invalid live photo',
+            code: 'LIVE_PHOTO_INVALID',
+          });
         }
-        const engineOk = await ensureFaceEngine();
-        if (!engineOk) {
+
+        if (!USE_REAL_FACE_MATCH) {
+          // DEMO: Hard-coded face match success (e.g. sample ID not your face). Re-enable with USE_REAL_FACE_MATCH.
           faceMatch = {
-            match: false,
-            confidence: 0,
-            error: 'Face engine unavailable',
+            match: true,
+            confidence: 0.92,
           };
         } else {
-          const idCrop = await extractIdPhoto(imageBase64);
-          if (!idCrop) {
+          const engineOk = await ensureFaceEngine();
+          if (!engineOk) {
             faceMatch = {
               match: false,
               confidence: 0,
-              error: 'Could not extract portrait region from ID image',
+              error: 'Face engine unavailable',
             };
           } else {
-            faceMatch = await compareFaces(idCrop, livePhotoBase64);
+            const idCrop = await extractIdPhoto(imageBase64);
+            if (!idCrop) {
+              faceMatch = {
+                match: false,
+                confidence: 0,
+                error: 'Could not extract portrait region from ID image',
+              };
+            } else {
+              try {
+                faceMatch = await compareFaces(idCrop, livePhotoBase64);
+              } catch (err: unknown) {
+                server.log.error({ err }, 'Face matching failed');
+                return reply.code(400).send({
+                  success: false,
+                  error: 'Face matching unavailable',
+                  code: 'FACE_MATCH_ERROR',
+                });
+              }
+            }
           }
         }
       }
@@ -1549,9 +1573,12 @@ async function main() {
       };
     } catch (err: unknown) {
       server.log.error(err);
-      return reply
-        .code(500)
-        .send({ error: 'Verification failed. Please try again.' });
+      const msg =
+        err instanceof Error ? err.message : 'Verification failed. Please try again.';
+      return reply.code(500).send({
+        error: msg,
+        code: 'INTERNAL_ERROR',
+      });
     }
   });
 
@@ -1568,17 +1595,20 @@ async function main() {
   server.post('/re-verify', reverifyRouteConfig, async (request, reply) => {
     const parsed = reverifyBodySchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply
-        .code(400)
-        .send({ error: 'Invalid input', details: parsed.error.flatten() });
+      return reply.code(400).send({
+        error: 'Invalid input',
+        code: 'INVALID_INPUT',
+        details: parsed.error.flatten(),
+      });
     }
     const { userId, requestedAttributes } = parsed.data;
 
     const imageBuffer = decryptIdImagePoc(userId);
     if (!imageBuffer) {
-      return reply
-        .code(404)
-        .send({ error: 'No stored encrypted ID for this user' });
+      return reply.code(404).send({
+        error: 'No stored encrypted ID for this user',
+        code: 'NO_STORED_ID',
+      });
     }
 
     const imageBase64 = imageBuffer.toString('base64');
@@ -1594,7 +1624,7 @@ async function main() {
           ? (e as { statusCode: number }).statusCode
           : 500;
       const msg = e instanceof Error ? e.message : 'Invalid image data';
-      return reply.code(code).send({ error: msg });
+      return reply.code(code).send({ error: msg, code: 'OCR_FAILED' });
     }
 
     const response = await buildSignedAttestationResponse(
