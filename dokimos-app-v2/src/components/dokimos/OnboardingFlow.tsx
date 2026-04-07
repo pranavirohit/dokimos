@@ -10,6 +10,7 @@ import {
   Screen02UploadOrCapture,
   Screen02VerifyProcessing,
 } from "@/components/DokimosFlow";
+import { DokimosErrorBoundary } from "@/components/dokimos/DokimosErrorBoundary";
 
 /**
  * Linear onboarding: government ID upload → liveness → TEE verify → `/app/vault`.
@@ -96,7 +97,9 @@ export function OnboardingFlow() {
 
   return (
     <>
-      <div className="relative min-h-[100dvh] w-full overflow-y-auto bg-gray-100">{content}</div>
+      <DokimosErrorBoundary>
+        <div className="relative min-h-[100dvh] w-full overflow-y-auto bg-gray-100">{content}</div>
+      </DokimosErrorBoundary>
 
       {process.env.NODE_ENV === "development" && (
         <div className="pointer-events-none fixed bottom-4 right-4 z-[100] max-w-[calc(100vw-2rem)]">

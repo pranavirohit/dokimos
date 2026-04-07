@@ -468,6 +468,24 @@ export function Screen02BLiveness({ onNext, onBack }: { onNext: () => void; onBa
   );
 }
 
+/** User-facing copy by error `code` from /api/verify or TEE (prod). */
+const VERIFY_ERROR_FRIENDLY: Record<string, string> = {
+  OCR_FAILED:
+    "We couldn’t read your ID document. Try a clearer, well-lit photo.",
+  INVALID_INPUT: "Something was wrong with the submitted data. Go back and try again.",
+  LIVE_PHOTO_INVALID:
+    "The selfie couldn’t be used. Retake it in good lighting.",
+  INTERNAL_ERROR:
+    "Verification failed on the server. Please try again in a moment.",
+  TEE_UNREACHABLE:
+    "We can’t reach the verification server. If you use a remote TEE, confirm it’s running and reachable from your network (try its /health URL). For local development, run the TEE and set TEE_ENDPOINT.",
+  NO_STORED_ID: "No saved ID found for re-verification.",
+  PAYLOAD_TOO_LARGE: "The image is too large. Use a smaller file.",
+  INVALID_JSON: "Invalid request.",
+  FACE_MATCH_ERROR:
+    "Face matching couldn’t run. Try again, or retake your selfie in good lighting.",
+};
+
 /** Calls TEE /verify with stored ID image + live selfie after liveness. */
 export function Screen02VerifyProcessing({
   onBack,
@@ -479,6 +497,7 @@ export function Screen02VerifyProcessing({
   setAttestationData: (data: AttestationData) => void;
 }) {
   const [error, setError] = useState<string | null>(null);
+  const [devDetails, setDevDetails] = useState<string | null>(null);
   const ran = useRef(false);
 
   useEffect(() => {
@@ -523,8 +542,56 @@ export function Screen02VerifyProcessing({
           /* ignore */
         }
         onSuccess();
-      } catch {
-        setError("Verification failed. Please try again.");
+      } catch (err: unknown) {
+        if (process.env.NODE_ENV === "development") {
+          console.error("[Screen02VerifyProcessing] verify failed", err);
+        }
+        let message = "We couldn’t complete verification. Please try again.";
+        let technical: string | null = null;
+
+        if (axios.isAxiosError(err) && err.response?.data) {
+          const data = err.response.data as {
+            error?: unknown;
+            code?: string;
+            details?: unknown;
+          };
+          const code = typeof data.code === "string" ? data.code : undefined;
+          const rawError =
+            typeof data.error === "string" && data.error.length > 0
+              ? data.error
+              : err.message;
+
+          if (process.env.NODE_ENV === "development") {
+            message = rawError;
+            technical = JSON.stringify(
+              {
+                status: err.response.status,
+                code,
+                details: data.details,
+                body: data,
+              },
+              null,
+              2
+            );
+          } else {
+            message =
+              (code && VERIFY_ERROR_FRIENDLY[code]) ||
+              "We couldn’t complete verification. Please try again.";
+          }
+        } else if (axios.isAxiosError(err) && err.response && !err.response.data) {
+          message = `Verification request failed (${err.response.status}).`;
+          if (process.env.NODE_ENV === "development") {
+            technical = err.message;
+          }
+        } else if (err instanceof Error) {
+          message = err.message;
+          if (process.env.NODE_ENV === "development") {
+            technical = err.stack ?? err.message;
+          }
+        }
+
+        setError(message);
+        setDevDetails(process.env.NODE_ENV === "development" ? technical : null);
       }
     };
 
@@ -547,6 +614,14 @@ export function Screen02VerifyProcessing({
             >
               {error}
             </p>
+            {devDetails ? (
+              <pre
+                className="mt-4 max-h-[min(40vh,320px)] w-full max-w-lg overflow-auto rounded-lg border border-red-200 bg-red-50/80 p-3 text-left text-[11px] leading-snug text-red-900 sm:text-xs"
+                style={{ fontFamily: "ui-monospace, monospace" }}
+              >
+                {devDetails}
+              </pre>
+            ) : null}
             <button
               type="button"
               onClick={onBack}
