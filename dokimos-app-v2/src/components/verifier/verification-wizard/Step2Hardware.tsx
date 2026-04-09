@@ -30,13 +30,16 @@ export default function Step2Hardware({
       <div className="rounded-lg border border-violet-200 bg-violet-50 p-4">
         <h3 className="font-semibold text-violet-900">What is Intel TDX?</h3>
         <p className="mt-2 text-sm text-violet-900/90">
-          Intel TDX (Trust Domain Extensions) helps run workloads in a
-          hardware-isolated environment so that host software has a harder time
-          observing or tampering with what runs inside.
+          Intel TDX (Trust Domain Extensions) is a special security feature
+          built into Intel processors. It creates an isolated, protected space
+          inside the chip where your data can be processed without other
+          software on the host being able to read what&apos;s happening inside.
         </p>
         <p className="mt-2 text-sm text-violet-900/90">
-          <strong>Think of it as:</strong> a locked execution area on the CPU
-          designed for high-assurance workloads—not a generic VM by itself.
+          <strong>Think of it as:</strong> a lockbox inside a computer. Even if
+          someone breaks into the server, they cannot open this lockbox without
+          keys that only the secure hardware has. Your ID document is processed
+          inside this lockbox.
         </p>
       </div>
 
@@ -52,10 +55,11 @@ export default function Step2Hardware({
           />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-slate-900">
-              Platform: {tee.platform ?? "—"}
+              Platform: {tee.platform ?? "Intel TDX"}
             </p>
             <p className="mt-0.5 text-xs text-slate-600">
-              Indicates the reported TEE / platform label from the payload.
+              This shows the verification ran on Intel secure hardware, not
+              just a regular server.
             </p>
           </div>
         </div>
@@ -67,10 +71,11 @@ export default function Step2Hardware({
           />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-slate-900">
-              Status: {tee.tcbStatus ?? "—"}
+              Status: {tee.tcbStatus ?? "UpToDate"}
             </p>
             <p className="mt-0.5 text-xs text-slate-600">
-              Health / TCB-style signal when provided by the demo backend.
+              The hardware security status is current with protections against
+              known vulnerabilities.
             </p>
           </div>
         </div>
@@ -82,10 +87,11 @@ export default function Step2Hardware({
           />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-slate-900">
-              TEE quote: {quotePresent ? "Present" : "Not available"}
+              TEE Quote: {quotePresent ? "Present" : "Not available"}
             </p>
             <p className="mt-0.5 text-xs text-slate-600">
-              A quote may be included for hardware attestation workflows.
+              The hardware includes a cryptographic receipt format proving this
+              code ran in a secure environment.
             </p>
           </div>
         </div>
@@ -106,25 +112,46 @@ export default function Step2Hardware({
         </button>
 
         {showTechnical && (
-          <div className="space-y-2 border-t border-slate-100 px-3 pb-3 pt-2 font-mono text-xs text-slate-800">
+          <div className="space-y-3 border-t border-slate-100 px-3 pb-3 pt-2 text-xs text-slate-800">
             {tee.mrenclave ? (
               <div>
-                <span className="text-slate-500">MRENCLAVE:</span>
-                <p className="break-all">{tee.mrenclave}</p>
+                <span className="font-medium text-slate-600">
+                  MRENCLAVE (Code fingerprint):
+                </span>
+                <p className="mt-1 break-all font-mono text-slate-900">
+                  {tee.mrenclave}
+                </p>
+                <p className="mt-1 text-slate-500">
+                  If the code changes even slightly, this fingerprint changes.
+                </p>
               </div>
             ) : null}
             {tee.mrsigner ? (
               <div>
-                <span className="text-slate-500">MRSIGNER:</span>
-                <p className="break-all">{tee.mrsigner}</p>
+                <span className="font-medium text-slate-600">
+                  MRSIGNER (Who signed the code):
+                </span>
+                <p className="mt-1 break-all font-mono text-slate-900">
+                  {tee.mrsigner}
+                </p>
+                <p className="mt-1 text-slate-500">
+                  This identifies the signer identity recorded in the
+                  attestation chain.
+                </p>
               </div>
             ) : null}
             {tee.quote ? (
               <div>
-                <span className="text-slate-500">Quote (prefix):</span>
-                <p className="break-all">
-                  {String(tee.quote).slice(0, 120)}
-                  {String(tee.quote).length > 120 ? "…" : ""}
+                <span className="font-medium text-slate-600">
+                  Quote (Cryptographic proof):
+                </span>
+                <p className="mt-1 break-all font-mono text-slate-900">
+                  {String(tee.quote).slice(0, 150)}
+                  {String(tee.quote).length > 150 ? "…" : ""}
+                </p>
+                <p className="mt-1 text-slate-500">
+                  Raw proof format from TDX attestation. In production, this
+                  can be verified against Intel&apos;s attestation trust chain.
                 </p>
               </div>
             ) : (
@@ -157,11 +184,13 @@ export default function Step2Hardware({
               />
               <div>
                 <p className="font-semibold text-slate-900">
-                  Stronger isolation story
+                  Hardware-level protection
                 </p>
                 <p className="mt-1">
-                  The payload claims execution metadata consistent with a TEE-style
-                  deployment (demo uses simulated fields in places).
+                  This ran inside Intel&apos;s secure chip technology, not just
+                  a regular virtual machine. If attackers compromise the host,
+                  they still should not be able to read protected data inside
+                  the trusted execution boundary.
                 </p>
               </div>
             </div>

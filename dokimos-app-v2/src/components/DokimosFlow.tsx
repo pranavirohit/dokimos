@@ -13,8 +13,11 @@ import {
   Shield,
   ArrowLeft,
   Check,
+  CheckCircle,
+  ChevronDown,
+  ChevronUp,
   ExternalLink,
-  Copy,
+  Code,
   X,
   XCircle,
   Activity,
@@ -53,6 +56,15 @@ import {
   getDisplayedAttributeKeys,
   isExcludedFromConsumerActivityList,
 } from "@/lib/verificationRequestDisplay";
+import {
+  formatAttributesList,
+  formatAttributeName,
+  formatAttributeValue,
+  formatTimestamp,
+  containsPersonalData,
+  getEtherscanVerifyUrl,
+  getEigenDashboardUrl,
+} from "@/lib/attestationUtils";
 import { useDokimosApp } from "@/contexts/DokimosAppContext";
 import {
   STORAGE_HAS_ENCRYPTED_ID,
@@ -1060,22 +1072,37 @@ export function Screen05Receipt({
   attestationData: AttestationData | null;
   selectedRequest: VerificationRequest | null;
 }) {
-  const [accordionOpen, setAccordionOpen] = useState(false);
+  const [showVerification, setShowVerification] = useState(false);
+  const [showTechnical, setShowTechnical] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
-  const companyName = selectedRequest?.verifierName || "Unknown Company";
+  if (!attestationData) {
+    return (
+      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4">
+        <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-10 text-center shadow-2xl">
+          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-dokimos-accent" />
+          <p className="text-slate-600">Loading verification details...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const truncate = (str: string, length: number = 6) => {
-    if (str.length <= length * 2) return str;
-    return `${str.slice(0, length)}...${str.slice(-length)}`;
+  const verifierName = selectedRequest?.verifierName || "Unknown verifier";
+  const verifiedAt = formatTimestamp(attestationData.timestamp);
+  const expiresAt =
+    typeof (attestationData as AttestationData & { expiresAt?: string }).expiresAt ===
+    "string"
+      ? formatTimestamp(
+          (attestationData as AttestationData & { expiresAt?: string }).expiresAt as string
+        )
+      : null;
+  const messageHasPersonalData = containsPersonalData(attestationData.message);
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(text);
+    setTimeout(() => setCopiedField(null), 2000);
   };
-
-  const timestamp = attestationData?.timestamp 
-    ? new Date(attestationData.timestamp).toLocaleDateString("en-US", {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-      })
-    : "April 1, 2026";
 
   return (
     <div
@@ -1083,13 +1110,13 @@ export function Screen05Receipt({
       role="presentation"
     >
       <div
-        className={REQUEST_STYLE_MODAL_PANEL}
+        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-slate-200/90 bg-white shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="receipt-verified-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-3 flex justify-end">
+        <div className="flex justify-end px-5 pb-0 pt-4 sm:px-6">
           <button
             type="button"
             onClick={onBack}
@@ -1099,162 +1126,292 @@ export function Screen05Receipt({
             <X size={22} />
           </button>
         </div>
-        <div style={{ fontFamily: RECEIPT_SANS }}>
-        <h1
-          className="text-center text-[17px] font-bold text-[#0F1B4C]"
-          style={{ fontFamily: RECEIPT_SANS }}
-        >
-          Dokimos
-        </h1>
-
-      <div className="mt-4 flex flex-col items-center px-0 pb-2 sm:mt-5">
-        <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-600">
-          <Check size={40} className="text-white" />
-        </div>
-
-        <h2
-          id="receipt-verified-title"
-          className="mb-4 text-4xl font-bold text-emerald-600 sm:text-5xl md:text-[56px]"
-          style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}
-        >
-          Verified
-        </h2>
-
-        <div className="my-4 h-px w-full bg-gray-200" />
-
-        <p
-          className="mb-2 text-center text-lg font-medium text-gray-900 sm:text-[22px]"
-          style={{ fontFamily: RECEIPT_SANS }}
-        >
-          Shared with {companyName}
-        </p>
-        <p className="mb-4 text-[13px] text-gray-500" style={{ fontFamily: RECEIPT_SANS }}>
-          Verified on {timestamp}
-        </p>
-
-        {/* Eigen Branding Badge */}
-        <div className="mb-6 w-full rounded-xl border border-teal-200 bg-gradient-to-r from-teal-50 to-slate-50 p-4">
-          <div className="mb-2 flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-dokimos-accent">
-              <Shield className="h-6 w-6 text-white" />
+        <div className="px-5 pb-4 sm:px-6" style={{ fontFamily: RECEIPT_SANS }}>
+          <div className="mx-auto max-w-2xl">
+            <div className="mb-4 mt-2 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 mx-auto">
+              <CheckCircle className="h-10 w-10 text-green-600" />
             </div>
-            <div>
-              <p className="text-sm font-semibold text-teal-900" style={{ fontFamily: RECEIPT_SANS }}>
-                Powered by EigenCompute
+
+            <h2
+              id="receipt-verified-title"
+              className="mb-2 text-center text-2xl font-semibold text-gray-900"
+            >
+              Verification Complete
+            </h2>
+
+            <div className="space-y-1 text-center text-gray-600">
+              <p className="text-lg font-medium">Sent to {verifierName}</p>
+              <p className="text-sm">
+                {formatAttributesList(attestationData.attributes)} • {verifiedAt}
               </p>
-              <p className="text-xs text-teal-700" style={{ fontFamily: RECEIPT_SANS }}>
-                Intel TDX Trusted Execution Environment
+            </div>
+
+            <div className="mb-6 mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <h3 className="mb-2 text-sm font-semibold text-gray-900">What you shared:</h3>
+              <ul className="space-y-1">
+                {Object.entries(attestationData.attributes).map(([key, value]) => (
+                  <li key={key} className="flex items-center gap-2 text-sm text-gray-700">
+                    <CheckCircle className="h-4 w-4 shrink-0 text-green-600" />
+                    <span>
+                      {formatAttributeName(key)}: {formatAttributeValue(value)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-3 space-y-1 border-t border-gray-300 pt-3 text-xs text-gray-600">
+                <p>• Sent to: {verifierName}</p>
+                <p>• Verified: {verifiedAt}</p>
+                {expiresAt ? <p>• Expires: {expiresAt}</p> : null}
+              </div>
+            </div>
+
+            <div className="mb-6 rounded-lg border border-teal-200 bg-gradient-to-r from-teal-50 to-cyan-50 p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm">
+                  <Shield className="h-6 w-6 text-teal-600" />
+                </div>
+                <div className="flex-1">
+                  <div className="mb-1 flex items-center gap-2">
+                    <h3 className="font-semibold text-teal-900">Powered by EigenCompute</h3>
+                    <span className="rounded-full bg-teal-600 px-2 py-0.5 text-xs text-white">
+                      Intel TDX
+                    </span>
+                  </div>
+                  <p className="mb-3 text-sm text-teal-800">
+                    This verification ran inside <strong>Intel TDX secure hardware</strong>,
+                    not a regular server. {verifierName} can independently verify the proof
+                    using public infrastructure. No need to trust Dokimos.
+                  </p>
+                  <details className="text-sm">
+                    <summary className="cursor-pointer font-medium text-teal-700 hover:text-teal-800">
+                      What does this mean?
+                    </summary>
+                    <div className="mt-2 space-y-2 border-l-2 border-teal-300 pl-4 text-teal-800">
+                      <p>
+                        <strong>Secure Processing:</strong> Your ID is processed in a
+                        hardware-isolated environment that Dokimos cannot directly inspect.
+                      </p>
+                      <p>
+                        <strong>Cryptographic Proof:</strong> The attestation includes
+                        signatures and measurements tied to genuine TDX workflows.
+                      </p>
+                      <p>
+                        <strong>Independent Verification:</strong> {verifierName} can verify
+                        these proofs without relying on Dokimos claims.
+                      </p>
+                    </div>
+                  </details>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowVerification(!showVerification)}
+              className="mb-2 flex w-full items-center justify-between rounded-lg border border-gray-200 p-4 transition-colors hover:bg-gray-50"
+            >
+              <span className="font-semibold text-gray-900">
+                How {verifierName} can verify this independently
+              </span>
+              {showVerification ? (
+                <ChevronUp className="h-5 w-5" />
+              ) : (
+                <ChevronDown className="h-5 w-5" />
+              )}
+            </button>
+
+            {showVerification && (
+              <div className="mb-6 mt-4 space-y-4 px-4 pb-4">
+                <p className="mb-4 text-sm text-gray-600">
+                  {verifierName} can verify this attestation through independent,
+                  third-party infrastructure:
+                </p>
+
+                <div className="flex gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-100">
+                    <span className="text-sm font-semibold text-teal-700">1</span>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="mb-1 font-medium text-gray-900">
+                      Verify Signature on Etherscan
+                    </h4>
+                    <p className="mb-2 text-sm text-gray-600">
+                      Confirms the signed payload is authentic and unmodified.
+                    </p>
+                    <a
+                      href={getEtherscanVerifyUrl()}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-sm font-medium text-teal-600 hover:text-teal-700"
+                    >
+                      <span>Open Etherscan</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100">
+                    <span className="text-sm font-semibold text-indigo-700">2</span>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="mb-1 font-medium text-gray-900">
+                      View TEE Deployment on EigenCloud
+                    </h4>
+                    <p className="mb-2 text-sm text-gray-600">
+                      Shows this proof is tied to trusted Intel TDX infrastructure.
+                    </p>
+                    <a
+                      href={getEigenDashboardUrl(attestationData)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                    >
+                      <span>Open EigenCloud Dashboard</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100">
+                    <span className="text-sm font-semibold text-gray-700">3</span>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="mb-1 font-medium text-gray-900">
+                      Audit Source Code on GitHub
+                    </h4>
+                    <p className="mb-2 text-sm text-gray-600">
+                      Review the code path used to generate this attestation.
+                    </p>
+                    <a
+                      href="https://github.com/pranavirohit/dokimos"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-700"
+                    >
+                      <span>View on GitHub</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-6 rounded-lg border border-gray-200">
+              <button
+                onClick={() => setShowTechnical(!showTechnical)}
+                className="flex w-full items-center justify-between p-3 transition-colors hover:bg-gray-50"
+              >
+                <div className="flex items-center gap-2">
+                  <Code className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm font-medium text-gray-700">Technical Details</span>
+                </div>
+                {showTechnical ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </button>
+
+              {showTechnical && (
+                <div className="space-y-4 border-t border-gray-200 px-4 pb-4 pt-4">
+                  {messageHasPersonalData ? (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                      Warning: message payload appears to contain raw personal data.
+                    </div>
+                  ) : null}
+
+                  <div>
+                    <div className="mb-1 flex items-start justify-between">
+                      <label className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                        Cryptographic Signature
+                      </label>
+                      <button
+                        onClick={() => copyToClipboard(attestationData.signature)}
+                        className="text-xs text-teal-600 hover:text-teal-700"
+                      >
+                        {copiedField === attestationData.signature ? "Copied!" : "Copy"}
+                      </button>
+                    </div>
+                    <code className="block break-all rounded border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-xs text-gray-900">
+                      {attestationData.signature}
+                    </code>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Proof that the TEE wallet signed this exact payload.
+                    </p>
+                  </div>
+
+                  <div>
+                    <div className="mb-1 flex items-start justify-between">
+                      <label className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                        Signer Address (TEE Wallet)
+                      </label>
+                      <button
+                        onClick={() => copyToClipboard(attestationData.signer)}
+                        className="text-xs text-teal-600 hover:text-teal-700"
+                      >
+                        {copiedField === attestationData.signer ? "Copied!" : "Copy"}
+                      </button>
+                    </div>
+                    <code className="block break-all rounded border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-xs text-gray-900">
+                      {attestationData.signer}
+                    </code>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Wallet address used by the secure attestation environment.
+                    </p>
+                  </div>
+
+                  {attestationData.messageHash &&
+                  attestationData.messageHash !== attestationData.attributesHash ? (
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">
+                        Message Hash
+                      </label>
+                      <code className="block break-all rounded border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-xs text-gray-900">
+                        {attestationData.messageHash}
+                      </code>
+                      <p className="mt-1 text-xs text-gray-500">
+                        Hash of the complete signed message.
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {attestationData.attributesHash ? (
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">
+                        Attributes Hash (Privacy-Preserving)
+                      </label>
+                      <code className="block break-all rounded border border-green-200 bg-green-50 px-3 py-2 font-mono text-xs text-green-900">
+                        {attestationData.attributesHash}
+                      </code>
+                      <p className="mt-1 text-xs text-green-700">
+                        ✓ Only this hash is publicly visible. Personal data stays private.
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </div>
+
+            <div className="mb-4 mt-6 text-center">
+              <p className="text-xs text-gray-500">
+                This attestation is cryptographically verifiable and cannot be forged.
+                {" "}
+                {verifierName} can verify it independently at any time.
               </p>
             </div>
           </div>
-          <p className="text-xs leading-relaxed text-teal-800" style={{ fontFamily: RECEIPT_SANS }}>
-            This verification ran in secure hardware. The cryptographic proof can be independently verified by anyone using Eigen's attestation infrastructure.
-          </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setAccordionOpen(!accordionOpen)}
-          className="mb-4 flex h-12 min-h-[44px] w-full items-center justify-between rounded-xl border border-gray-200 px-4"
-          style={{ fontFamily: RECEIPT_SANS }}
-        >
-          <span className="text-[15px] font-medium text-gray-900">How is this verified?</span>
-          <span className={`transform transition-transform ${accordionOpen ? "rotate-180" : ""}`}>▼</span>
-        </button>
-
-        {accordionOpen && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            className="mb-4 w-full px-1 text-[14px] leading-relaxed text-gray-600"
-            style={{ fontFamily: RECEIPT_SANS }}
-          >
-            This attestation was generated by code running inside an Intel TDX Trusted Execution Environment. 
-            The signature below was produced by a wallet that only that specific, auditable code can access. 
-            You can verify this yourself using the buttons below.
-          </motion.div>
-        )}
-
-        {attestationData && (
-          <>
-            <a
-              href={`https://etherscan.io/verifiedSignatures?${new URLSearchParams({
-                a: attestationData.signer,
-                m: attestationData.message,
-                s: attestationData.signature
-              })}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mb-3 flex h-12 w-full items-center justify-between rounded-xl border border-gray-200 px-4 transition-colors hover:bg-gray-50"
-              style={{ fontFamily: RECEIPT_SANS }}
-            >
-              <div className="flex items-center gap-2">
-                <div className="h-5 w-5 rounded-full bg-gray-200" />
-                <span className="text-[14px] font-medium text-gray-900">Verify Signature on Etherscan</span>
-              </div>
-              <ExternalLink size={16} className="text-dokimos-accent" />
-            </a>
-
-            <a
-              href={
-                attestationData?.eigen?.verificationUrl ??
-                getEigenVerificationDashboardUrl(attestationData?.eigen?.appId)
-              }
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mb-6 flex h-12 w-full items-center justify-between rounded-xl border border-gray-200 px-4 transition-colors hover:bg-gray-50"
-              style={{ fontFamily: RECEIPT_SANS }}
-            >
-              <div className="flex items-center gap-2">
-                <div className="h-5 w-5 rounded bg-[#0F1B4C]" />
-                <span className="text-[14px] font-medium text-gray-900">View Code on EigenCloud Dashboard</span>
-              </div>
-              <ExternalLink size={16} className="text-dokimos-accent" />
-            </a>
-          </>
-        )}
-
-        <div className="relative w-full rounded-xl bg-[#0F1B4C] p-4">
+        <div className="sticky bottom-0 mt-2 border-t border-gray-200 bg-white p-4">
           <button
             type="button"
-            className="absolute right-4 top-4 text-[11px] text-gray-400 hover:text-gray-300"
-            style={{ fontFamily: RECEIPT_SANS }}
+            onClick={onNext}
+            className="w-full rounded-lg bg-dokimos-accent px-6 py-3 text-lg font-semibold text-white transition-colors hover:bg-dokimos-accentHover"
           >
-            <Copy size={12} className="inline" /> Copy all
+            Done
           </button>
-          {attestationData ? (
-            <pre className="text-[11px] font-mono overflow-x-auto whitespace-pre-wrap break-all">
-              <span className="text-gray-400">message:</span> <span className="text-gray-200">{attestationData.message}</span>{"\n"}
-              <span className="text-gray-400">messageHash:</span> <span className="text-gray-200">{truncate(attestationData.messageHash, 6)}</span>{"\n"}
-              <span className="text-gray-400">hash:</span> <span className="text-teal-600">{truncate(attestationData.signature, 8)}</span>{"\n"}
-              <span className="text-gray-400">address:</span> <span className="text-teal-600">{truncate(attestationData.signer, 6)}</span>
-            </pre>
-          ) : (
-            <pre className="text-[11px] font-mono overflow-x-auto">
-              <span className="text-gray-400">message:</span> <span className="text-gray-200">Age Over 21</span>{"\n"}
-              <span className="text-gray-400">messageHash:</span> <span className="text-gray-200">0x7f9a3b...8f9a</span>{"\n"}
-              <span className="text-gray-400">hash:</span> <span className="text-teal-600">0x8a4c5e...3c4d</span>{"\n"}
-              <span className="text-gray-400">address:</span> <span className="text-teal-600">0x2b5f8c...5f8a</span>
-            </pre>
-          )}
-        </div>
-
-        <p
-          className="mt-6 text-center text-[11px] text-gray-400"
-          style={{ fontFamily: RECEIPT_SANS }}
-        >
-          Issued by Dokimos · Cryptographic identity infrastructure
-        </p>
-
-        <button
-          type="button"
-          onClick={onNext}
-          className="mt-8 h-12 min-h-[44px] w-full rounded-xl bg-dokimos-accent text-sm font-semibold text-white transition-colors hover:bg-dokimos-accentHover sm:h-14 sm:text-[15px]"
-          style={{ fontFamily: RECEIPT_SANS }}
-        >
-          Done
-        </button>
-      </div>
         </div>
       </div>
     </div>

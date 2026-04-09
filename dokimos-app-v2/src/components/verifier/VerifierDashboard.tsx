@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import Image from "next/image";
 import axios from "axios";
+import { createPortal } from "react-dom";
 import {
   Check,
   CheckCircle,
@@ -391,7 +392,11 @@ export function VerifierDashboard() {
               Business
             </p>
             <h1 className="mt-3 max-w-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-600 bg-clip-text text-3xl font-semibold tracking-tight text-transparent sm:text-[2rem] lg:text-[2.125rem]">
-              {activeTab === "overview" ? "Overview" : "Verification Dashboard"}
+              {activeTab === "overview"
+                ? "Overview"
+                : activeTab === "workflows"
+                  ? "Programs"
+                  : "Verified Users"}
             </h1>
           </header>
 
@@ -488,63 +493,66 @@ function OverviewTab({
 
   const recentActivity = recentActivityRequests;
 
+  const overviewStatCardClass =
+    "rounded-2xl border border-[#0B1739] bg-[#04102A] p-5 shadow-lg shadow-black/25 sm:p-6";
+
   return (
     <div className="w-full max-w-full space-y-8">
       {/* Stats — 1 col phone, 2 col small tablet, 4 col from ~900px (laptop) */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 min-[900px]:grid-cols-4 min-[900px]:gap-6">
-        <div className={dokimosCardClass}>
+        <div className={overviewStatCardClass}>
           <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-slate-400">
             Total verifications
           </p>
-          <p className="mb-1 text-3xl font-semibold tabular-nums text-slate-900 tracking-tight">
+          <p className="mb-1 text-3xl font-semibold tabular-nums tracking-tight text-white">
             {totalVerifications.toLocaleString()}
           </p>
-          <p className="mb-2 text-xs text-slate-500">This month</p>
-          <div className="flex items-center gap-1 text-xs text-emerald-600">
+          <p className="mb-2 text-xs text-slate-400">This month</p>
+          <div className="flex items-center gap-1 text-xs text-emerald-400">
             <TrendingUp size={14} />
             <span>12% vs last month</span>
           </div>
         </div>
 
-        <div className={dokimosCardClass}>
+        <div className={overviewStatCardClass}>
           <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-slate-400">
             Approval rate
           </p>
-          <p className="mb-1 text-3xl font-semibold tabular-nums text-slate-900 tracking-tight">
+          <p className="mb-1 text-3xl font-semibold tabular-nums tracking-tight text-white">
             {approvalRate}%
           </p>
-          <p className="mb-2 text-xs text-slate-500">Last 30 days</p>
-          <div className="flex items-center gap-1 text-xs text-emerald-600">
+          <p className="mb-2 text-xs text-slate-400">Last 30 days</p>
+          <div className="flex items-center gap-1 text-xs text-emerald-400">
             <TrendingUp size={14} />
             <span>2.1% vs previous period</span>
           </div>
         </div>
 
-        <div className={dokimosCardClass}>
+        <div className={overviewStatCardClass}>
           <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-slate-400">
             Avg completion time
           </p>
-          <p className="mb-1 text-3xl font-semibold tabular-nums text-slate-900 tracking-tight">
+          <p className="mb-1 text-3xl font-semibold tabular-nums tracking-tight text-white">
             3m 12s
           </p>
-          <p className="mb-2 text-xs text-slate-500">Median time to complete</p>
-          <div className="flex items-center gap-1 text-xs text-emerald-600">
+          <p className="mb-2 text-xs text-slate-400">Median time to complete</p>
+          <div className="flex items-center gap-1 text-xs text-emerald-400">
             <TrendingDown size={14} />
             <span>15s faster than last month</span>
           </div>
         </div>
 
-        <div className={dokimosCardClass}>
+        <div className={overviewStatCardClass}>
           <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-slate-400">
             Active workflows
           </p>
-          <p className="mb-1 text-3xl font-semibold tabular-nums text-slate-900 tracking-tight">
+          <p className="mb-1 text-3xl font-semibold tabular-nums tracking-tight text-white">
             {activeWorkflowCount.toLocaleString()}
           </p>
-          <p className="mb-2 text-xs text-slate-500">
+          <p className="mb-2 text-xs text-slate-400">
             {programs.length} program{programs.length === 1 ? "" : "s"} total
           </p>
-          <div className="flex items-center gap-1 text-xs text-emerald-600">
+          <div className="flex items-center gap-1 text-xs text-emerald-400">
             <Layers size={14} />
             <span>
               {activeWorkflowCount === programs.length
@@ -1055,20 +1063,20 @@ function VerificationsTab({
       <div className={`${dokimosCardClass} overflow-hidden !p-0`}>
         <div className="w-full overflow-x-auto">
           <table className="w-full min-w-[900px] table-fixed text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50">
+            <thead className="border-b border-[#0B1739] bg-[#04102A]">
               <tr>
                 <th className="w-[17%] min-w-0 px-4 py-3 text-left align-middle lg:w-[17%]" scope="col">
                   <button
                     type="button"
                     onClick={() => toggleSort("name")}
-                    className="inline-flex w-full items-center gap-1 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 hover:text-slate-900"
+                    className="inline-flex w-full items-center gap-1 text-left text-xs font-semibold uppercase tracking-wider text-slate-200 hover:text-white"
                   >
                     Name
-                    <ArrowUpDown className="h-3 w-3 shrink-0 text-slate-400" />
+                    <ArrowUpDown className="h-3 w-3 shrink-0 text-slate-300" />
                   </button>
                 </th>
                 <th
-                  className="hidden w-[17%] min-w-0 px-4 py-3 text-left align-middle text-xs font-semibold uppercase tracking-wider text-slate-600 lg:table-cell lg:w-[18%]"
+                  className="hidden w-[17%] min-w-0 px-4 py-3 text-left align-middle text-xs font-semibold uppercase tracking-wider text-slate-200 lg:table-cell lg:w-[18%]"
                   scope="col"
                 >
                   Email
@@ -1077,20 +1085,20 @@ function VerificationsTab({
                   <button
                     type="button"
                     onClick={() => toggleSort("workflow")}
-                    className="inline-flex w-full items-center gap-1 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 hover:text-slate-900"
+                    className="inline-flex w-full items-center gap-1 text-left text-xs font-semibold uppercase tracking-wider text-slate-200 hover:text-white"
                   >
                     Workflow
-                    <ArrowUpDown className="h-3 w-3 shrink-0 text-slate-400" />
+                    <ArrowUpDown className="h-3 w-3 shrink-0 text-slate-300" />
                   </button>
                 </th>
                 <th className="w-[12%] min-w-0 px-4 py-3 text-left align-middle lg:w-[11%]" scope="col">
                   <button
                     type="button"
                     onClick={() => toggleSort("status")}
-                    className="inline-flex w-full items-center gap-1 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 hover:text-slate-900"
+                    className="inline-flex w-full items-center gap-1 text-left text-xs font-semibold uppercase tracking-wider text-slate-200 hover:text-white"
                   >
                     Status
-                    <ArrowUpDown className="h-3 w-3 shrink-0 text-slate-400" />
+                    <ArrowUpDown className="h-3 w-3 shrink-0 text-slate-300" />
                   </button>
                 </th>
                 <th className="w-[15%] min-w-0 px-4 py-3 text-left align-middle lg:w-[17%]" scope="col">
@@ -1098,21 +1106,21 @@ function VerificationsTab({
                     type="button"
                     onClick={() => toggleSort("verified")}
                     title="Requested, decision, or verified time depending on status"
-                    className="inline-flex w-full min-w-0 items-center gap-1 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 hover:text-slate-900"
+                    className="inline-flex w-full min-w-0 items-center gap-1 text-left text-xs font-semibold uppercase tracking-wider text-slate-200 hover:text-white"
                   >
                     <span className="truncate">Last activity</span>
-                    <ArrowUpDown className="h-3 w-3 shrink-0 text-slate-400" />
+                    <ArrowUpDown className="h-3 w-3 shrink-0 text-slate-300" />
                   </button>
                 </th>
                 <th
-                  className="w-[11%] min-w-0 px-3 py-3 text-left align-middle text-xs font-semibold uppercase tracking-wider text-slate-600 lg:w-[9%]"
+                  className="w-[11%] min-w-0 px-3 py-3 text-left align-middle text-xs font-semibold uppercase tracking-wider text-slate-200 lg:w-[9%]"
                   scope="col"
                   title="Resend a verification request when the row is still open or can be retried"
                 >
                   Send
                 </th>
                 <th
-                  className="w-[11%] min-w-0 pl-2 pr-5 py-3 text-left align-middle text-xs font-semibold uppercase tracking-wider text-slate-600 lg:w-[9%] lg:pr-6"
+                  className="w-[11%] min-w-0 pl-2 pr-5 py-3 text-left align-middle text-xs font-semibold uppercase tracking-wider text-slate-200 lg:w-[9%] lg:pr-6"
                   scope="col"
                 >
                   Review
@@ -1547,6 +1555,21 @@ function ProgramModal({
   const [complianceNote, setComplianceNote] = useState("");
   const [selectedAttributes, setSelectedAttributes] = useState<string[]>([]);
   const [slugManual, setSlugManual] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mounted]);
 
   useEffect(() => {
     if (mode === "edit" && initialProgram) {
@@ -1594,7 +1617,7 @@ function ProgramModal({
 
   const isEdit = mode === "edit";
 
-  return (
+  const modal = (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={onClose}
@@ -1742,5 +1765,8 @@ function ProgramModal({
       </div>
     </div>
   );
+
+  if (!mounted) return null;
+  return createPortal(modal, document.body);
 }
 

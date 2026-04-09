@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, ArrowLeft } from "lucide-react";
 import type { VerificationRequest } from "@/types/dokimos";
 import type { WizardAttestation } from "@/components/verifier/verification-wizard/wizardAttestation";
@@ -22,14 +23,31 @@ export default function VerificationWizard({
   onClose,
 }: VerificationWizardProps) {
   const [currentStep, setCurrentStep] = useState(1);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!open || !mounted) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open, mounted]);
 
   if (!open) return null;
 
   const attestation = request.attestation as WizardAttestation | null | undefined;
+  const overlayClass =
+    "fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4";
+
   if (!attestation || typeof attestation !== "object") {
-    return (
+    const noAttestationUi = (
       <div
-        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+        className={overlayClass}
         role="dialog"
         aria-modal="true"
         aria-labelledby="verification-wizard-title"
@@ -55,6 +73,8 @@ export default function VerificationWizard({
         </div>
       </div>
     );
+    if (!mounted) return null;
+    return createPortal(noAttestationUi, document.body);
   }
 
   const totalSteps = 5;
@@ -77,9 +97,9 @@ export default function VerificationWizard({
     onClose();
   };
 
-  return (
+  const wizardUi = (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+      className={overlayClass}
       role="dialog"
       aria-modal="true"
       aria-labelledby="verification-wizard-title"
@@ -147,4 +167,7 @@ export default function VerificationWizard({
       </div>
     </div>
   );
+
+  if (!mounted) return null;
+  return createPortal(wizardUi, document.body);
 }
