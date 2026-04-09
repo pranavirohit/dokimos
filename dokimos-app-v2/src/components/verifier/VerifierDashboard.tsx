@@ -754,8 +754,28 @@ function VerificationsTab({
     });
   }, [requests, workflowFilter, searchQuery, statusFilter, dateRange]);
 
+  const dedupedFiltered = useMemo(() => {
+    const byName = new Map<string, VerificationRequest>();
+    for (const req of baseFiltered) {
+      const key = displayNameForRequest(req).trim().toLowerCase();
+      const existing = byName.get(key);
+      if (!existing) {
+        byName.set(key, req);
+        continue;
+      }
+      const existingTs = new Date(
+        existing.completedAt || existing.createdAt
+      ).getTime();
+      const nextTs = new Date(req.completedAt || req.createdAt).getTime();
+      if (nextTs > existingTs) {
+        byName.set(key, req);
+      }
+    }
+    return Array.from(byName.values());
+  }, [baseFiltered]);
+
   const sortedRows = useMemo(() => {
-    const list = [...baseFiltered];
+    const list = [...dedupedFiltered];
     const dir = sortDir === "asc" ? 1 : -1;
     list.sort((a, b) => {
       let cmp = 0;
@@ -775,7 +795,7 @@ function VerificationsTab({
       return cmp * dir;
     });
     return list;
-  }, [baseFiltered, sortKey, sortDir, programs]);
+  }, [dedupedFiltered, sortKey, sortDir, programs]);
 
   const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize));
   const safePage = Math.min(page, totalPages);

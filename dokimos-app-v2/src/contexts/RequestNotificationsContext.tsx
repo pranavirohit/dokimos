@@ -10,7 +10,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import axios from "axios";
 import { useDokimosApp } from "@/contexts/DokimosAppContext";
@@ -43,7 +42,6 @@ export function usePendingRequestCount(): number {
 }
 
 export function RequestNotificationsProvider({ children }: { children: ReactNode }) {
-  const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
   const { setSelectedRequest } = useDokimosApp();
 
@@ -144,8 +142,9 @@ export function RequestNotificationsProvider({ children }: { children: ReactNode
       dismissedModalIdsRef.current.add(modalRequest.requestId);
     }
     setModalVisible(false);
+    setSelectedRequest(null);
     setTimeout(() => setModalRequest(null), 280);
-  }, [modalRequest]);
+  }, [modalRequest, setSelectedRequest]);
 
   const openRequestModal = useCallback(
     (req: VerificationRequest) => {
@@ -162,9 +161,10 @@ export function RequestNotificationsProvider({ children }: { children: ReactNode
       dismissedModalIdsRef.current.add(modalRequest.requestId);
     }
     setModalVisible(false);
+    setSelectedRequest(null);
     setModalRequest(null);
-    router.push("/app/requests/receipt");
-  }, [modalRequest, router]);
+    void fetchRequests();
+  }, [modalRequest, setSelectedRequest, fetchRequests]);
 
   const handleDenied = useCallback(() => {
     dismissNotification();

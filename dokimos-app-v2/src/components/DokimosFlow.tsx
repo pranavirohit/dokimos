@@ -25,6 +25,7 @@ import {
   Clock,
 } from "lucide-react";
 import axios from "axios";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -1544,6 +1545,8 @@ export function Screen06History({
   const renderRequestCard = (request: VerificationRequest) => {
     const initial = (request.verifierName ?? "?").charAt(0).toUpperCase();
     const badgeColor = getCompanyBadgeColor(request.verifierName ?? "");
+    const showAirbnbLogo = (request.verifierName ?? "").toLowerCase().includes("airbnb");
+    const showCoinbaseLogo = (request.verifierName ?? "").toLowerCase().includes("coinbase");
     const attrs = getDisplayedAttributeKeys(request);
     const isPending = request.status === "pending";
     const approved = request.status === "approved";
@@ -1552,12 +1555,30 @@ export function Screen06History({
 
     const RowInner = (
       <>
-        <div
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[15px] font-semibold text-white shadow-sm"
-          style={{ backgroundColor: badgeColor, fontFamily: sans }}
-        >
-          {initial}
-        </div>
+        {showAirbnbLogo ? (
+          <Image
+            src="/airbnb_logo.png"
+            alt="Airbnb"
+            width={40}
+            height={40}
+            className="h-10 w-10 shrink-0 rounded-full object-cover shadow-sm"
+          />
+        ) : showCoinbaseLogo ? (
+          <Image
+            src="/coinbase-logo-icon.webp"
+            alt="Coinbase"
+            width={40}
+            height={40}
+            className="h-10 w-10 shrink-0 rounded-full object-cover shadow-sm"
+          />
+        ) : (
+          <div
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[15px] font-semibold text-white shadow-sm"
+            style={{ backgroundColor: badgeColor, fontFamily: sans }}
+          >
+            {initial}
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           <p className="text-[15px] font-medium text-gray-900" style={{ fontFamily: sans }}>
             {request.verifierName ?? "Unknown"}

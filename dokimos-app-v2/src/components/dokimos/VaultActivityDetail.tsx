@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import Image from "next/image";
 import { Check } from "lucide-react";
 import { vaultDetailTitleClass, vaultInsetPanelClass, vaultPlaidDetailCardClass } from "@/lib/vaultDetailPlaid";
 import { formatVerificationActivityRelativeTime } from "@/lib/verificationActivityTime";
@@ -54,6 +55,11 @@ export function VaultActivityDetail({ allRequests }: VaultActivityDetailProps) {
                 {approvedRequests.map((r) => {
                   const initial = (r.verifierName ?? "?").charAt(0).toUpperCase();
                   const badgeColor = getCompanyBadgeColor(r.verifierName ?? "");
+                  const lowerVerifier = (r.verifierName ?? "").toLowerCase();
+                  const showAirbnbLogo = lowerVerifier.includes("airbnb");
+                  const showCoinbaseLogo = lowerVerifier.includes("coinbase");
+                  const showUberLogo = lowerVerifier.includes("uber");
+                  const showUpworkLogo = lowerVerifier.includes("upwork");
                   const keys = getDisplayedAttributeKeys(r);
                   const labels = keys.map(formatVerificationAttributeKey);
                   const whenIso = r.completedAt || r.createdAt;
@@ -62,13 +68,47 @@ export function VaultActivityDetail({ allRequests }: VaultActivityDetailProps) {
                   return (
                     <li key={r.requestId}>
                       <div className="flex items-start gap-3 px-4 py-3.5 sm:gap-4 sm:px-5 sm:py-4">
-                        <div
-                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[15px] font-semibold text-white shadow-sm"
-                          style={{ backgroundColor: badgeColor, fontFamily: sans }}
-                          aria-hidden
-                        >
-                          {initial}
-                        </div>
+                        {showAirbnbLogo ? (
+                          <Image
+                            src="/airbnb_logo.png"
+                            alt="Airbnb"
+                            width={40}
+                            height={40}
+                            className="h-10 w-10 shrink-0 rounded-full object-cover shadow-sm"
+                          />
+                        ) : showCoinbaseLogo ? (
+                          <Image
+                            src="/coinbase-logo-icon.webp"
+                            alt="Coinbase"
+                            width={40}
+                            height={40}
+                            className="h-10 w-10 shrink-0 rounded-full object-cover shadow-sm"
+                          />
+                        ) : showUberLogo ? (
+                          <Image
+                            src="/uber.svg"
+                            alt="Uber"
+                            width={40}
+                            height={40}
+                            className="h-10 w-10 shrink-0 rounded-full bg-white object-cover p-1 shadow-sm"
+                          />
+                        ) : showUpworkLogo ? (
+                          <Image
+                            src="/upwork-square-logo-icon-png-701751694968615sgotnnc8sf.png"
+                            alt="Upwork"
+                            width={40}
+                            height={40}
+                            className="h-10 w-10 shrink-0 rounded-full object-cover shadow-sm"
+                          />
+                        ) : (
+                          <div
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[15px] font-semibold text-white shadow-sm"
+                            style={{ backgroundColor: badgeColor, fontFamily: sans }}
+                            aria-hidden
+                          >
+                            {initial}
+                          </div>
+                        )}
                         <div className="min-w-0 flex-1">
                           <p
                             className="text-[15px] font-semibold leading-snug text-slate-900"
