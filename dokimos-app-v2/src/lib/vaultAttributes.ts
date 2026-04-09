@@ -1,6 +1,7 @@
 /** Demo / fallback attributes when no attestation is loaded — kept in sync with TEE shape. */
 export const VAULT_DEMO_ATTRIBUTES: Record<string, string | boolean> = {
   name: "Janice Sample",
+  address: "123 Main St, San Francisco, CA",
   dateOfBirth: "1990-01-15",
   ageOver18: true,
   ageOver21: true,
@@ -38,10 +39,10 @@ export function formatVaultAttributeDisplay(key: string, value: string | boolean
   return s;
 }
 
-const VAULT_IDENTITY_KEYS = new Set(["name", "dateOfBirth", "nationality"]);
+const VAULT_IDENTITY_KEYS = new Set(["name", "address", "dateOfBirth", "nationality"]);
 
 /** Stable order for primary profile fields in vault UI (rows). */
-export const VAULT_PRIMARY_IDENTITY_KEYS = ["name", "dateOfBirth", "nationality"] as const;
+export const VAULT_PRIMARY_IDENTITY_KEYS = ["name", "address", "dateOfBirth", "nationality"] as const;
 
 export function sortIdentityEntries(entries: [string, string | boolean][]) {
   const map = new Map(entries);

@@ -78,6 +78,9 @@ function HeroVisual() {
             </p>
             <p className="mt-3 text-[22px] font-bold text-slate-900">Verified</p>
             <p className="mt-4 text-[12px] font-medium text-slate-600">Janice Sample</p>
+            <p className="mt-1 text-[11px] leading-snug text-slate-500">
+              123 Main St, San Francisco, CA
+            </p>
           </div>
           <div className="rounded-2xl border border-amber-200/60 bg-gradient-to-br from-amber-50 to-orange-50/80 p-4 shadow-[0_8px_24px_rgba(251,191,36,0.12)]">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-900/80">
