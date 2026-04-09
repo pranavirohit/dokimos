@@ -8,15 +8,14 @@ import {
   useRef,
   useCallback,
   useMemo,
-  type ChangeEvent,
 } from "react";
 import {
   Shield,
   ArrowLeft,
-  ImagePlus,
   Check,
   ExternalLink,
   Copy,
+  X,
   XCircle,
   Activity,
   Settings,
@@ -33,6 +32,7 @@ import {
   type HubAction,
 } from "@/components/dokimos/DokimosPageChrome";
 import { useHowItWorksModal } from "@/contexts/HowItWorksModalContext";
+import { useRequestNotificationsContext } from "@/contexts/RequestNotificationsContext";
 import { VaultInfoMenu } from "@/components/dokimos/VaultInfoMenu";
 import { VaultCredentialRowList } from "@/components/dokimos/VaultVerifiedAttributeList";
 import { VaultNavigationDashboard } from "@/components/dokimos/VaultHomepage";
@@ -44,15 +44,19 @@ import {
   groupVaultAttributes,
   sortIdentityEntries,
 } from "@/lib/vaultAttributes";
+import { formatVerificationActivityRelativeTime } from "@/lib/verificationActivityTime";
 import { workflowDisplayName } from "@/lib/workflowDisplayName";
 import {
+  dedupeAttributeKeysForDisplay,
   formatVerificationAttributeKey,
   getCompanyBadgeColor,
   getDisplayedAttributeKeys,
+  isExcludedFromConsumerActivityList,
 } from "@/lib/verificationRequestDisplay";
 import { useDokimosApp } from "@/contexts/DokimosAppContext";
 import {
   STORAGE_HAS_ENCRYPTED_ID,
+  STORAGE_ID_IMAGE,
   STORAGE_LIVE_PHOTO,
   type AttestationData,
   type VerificationRequest,
@@ -147,27 +151,6 @@ function AppFlowScreenLayout({ children }: { children: React.ReactNode }) {
       <div className="mx-auto flex min-h-[100dvh] w-full max-w-[600px] flex-col px-4 sm:px-6 md:px-8 lg:max-w-3xl">
         {children}
       </div>
-    </div>
-  );
-}
-
-export function ShareRequestTopBar({ onBack }: { onBack: () => void }) {
-  return (
-    <div className="sticky top-0 z-10 flex shrink-0 items-center gap-3 border-b border-gray-200/80 bg-[#FAFAF9]/95 px-4 py-3 backdrop-blur-md sm:px-5">
-      <button
-        type="button"
-        onClick={onBack}
-        className="-ml-1 rounded-lg p-1 hover:bg-gray-200/60 transition-colors"
-        aria-label="Back"
-      >
-        <ArrowLeft size={22} className="text-gray-900" />
-      </button>
-      <span
-        className="text-[17px] font-semibold text-gray-900"
-        style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
-      >
-        Review request
-      </span>
     </div>
   );
 }
@@ -508,7 +491,7 @@ export function Screen02VerifyProcessing({
       let idImg: string | null = null;
       let live: string | null = null;
       try {
-        idImg = localStorage.getItem("dokimos_stored_image");
+        idImg = localStorage.getItem(STORAGE_ID_IMAGE);
         live = localStorage.getItem(STORAGE_LIVE_PHOTO);
       } catch {
         setError("Could not read stored images.");
@@ -679,8 +662,9 @@ export function Screen03Vault({
 }) {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
-  const { setSelectedRequest, setAttestationData } = useDokimosApp();
+  const { setAttestationData } = useDokimosApp();
   const { openHowItWorks } = useHowItWorksModal();
+  const { openRequestModal } = useRequestNotificationsContext();
 
   const attributes = useMemo(
     () => attestationData?.attributes ?? VAULT_DEMO_ATTRIBUTES,
@@ -711,14 +695,14 @@ export function Screen03Vault({
     const actions: HubAction[] = [];
     if (n > 0) {
       actions.push({
-        href: "/app/requests",
+        href: "/app/vault",
         label: "Review pending",
         variant: "primary",
         badge: n,
       });
     }
     actions.push({
-      href: "/app/requests",
+      href: "/app/vault",
       label: "Activity & history",
       variant: n > 0 ? "secondary" : "primary",
     });
@@ -813,8 +797,7 @@ export function Screen03Vault({
   }, [sessionStatus, session?.user?.email, fetchPending]);
 
   const handleReviewRequest = (req: VerificationRequest) => {
-    setSelectedRequest(req);
-    router.push("/app/requests/review");
+    openRequestModal(req);
   };
 
   const handleReVerify = async () => {
@@ -876,35 +859,6 @@ export function Screen03Vault({
                   ) : null}
                 </div>
               </div>
-
-              {attestationData?.biometricVerification ? (
-                <div
-                  className={`mt-4 flex items-start gap-3 rounded-xl border px-3 py-3 sm:px-4 ${
-                    attestationData.biometricVerification.faceMatch
-                      ? "border-emerald-200/80 bg-white/80"
-                      : "border-amber-200 bg-amber-50/70"
-                  }`}
-                >
-                  {attestationData.biometricVerification.faceMatch ? (
-                    <Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" strokeWidth={2.5} />
-                  ) : (
-                    <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" strokeWidth={2.5} />
-                  )}
-                  <div className="min-w-0">
-                    <p className="text-[14px] font-semibold text-slate-900" style={{ fontFamily: sans }}>
-                      {attestationData.biometricVerification.faceMatch
-                        ? "Face matched to ID"
-                        : "Face match check did not pass"}
-                    </p>
-                    <p className="mt-1 text-[12px] text-slate-600" style={{ fontFamily: sans }}>
-                      Confidence {(attestationData.biometricVerification.confidence * 100).toFixed(1)}%
-                      {attestationData.biometricVerification.error
-                        ? ` — ${attestationData.biometricVerification.error}`
-                        : ""}
-                    </p>
-                  </div>
-                </div>
-              ) : null}
             </div>
 
             <VaultCredentialRowList
@@ -949,7 +903,9 @@ export function Screen03Vault({
                 </div>
               ) : (
                 <ul className="space-y-2">
-                  {pendingRequests.map((req) => (
+                  {pendingRequests.map((req) => {
+                    const fieldCount = dedupeAttributeKeysForDisplay(req.requestedAttributes ?? []).length;
+                    return (
                     <li key={req.requestId}>
                       <button
                         type="button"
@@ -961,8 +917,7 @@ export function Screen03Vault({
                             {req.verifierName || "Verification request"}
                           </p>
                           <p className="mt-0.5 text-[13px] text-slate-500" style={{ fontFamily: sans }}>
-                            {req.requestedAttributes.length}{" "}
-                            {req.requestedAttributes.length === 1 ? "attribute" : "attributes"} requested
+                            {fieldCount} {fieldCount === 1 ? "field" : "fields"} requested
                           </p>
                         </div>
                         <span className="shrink-0 text-[13px] font-medium text-emerald-700" style={{ fontFamily: sans }}>
@@ -970,17 +925,9 @@ export function Screen03Vault({
                         </span>
                       </button>
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
-              )}
-              {!requestsLoading && pendingRequests.length > 0 && (
-                <Link
-                  href="/app/requests"
-                  className="mt-3 block text-center text-[13px] font-medium text-slate-600 underline decoration-slate-300 underline-offset-4 hover:text-slate-900"
-                  style={{ fontFamily: sans }}
-                >
-                  View all requests
-                </Link>
               )}
             </section>
 
@@ -1094,237 +1041,12 @@ export function Screen03Vault({
   );
 }
 
-// Screen 04 - Review & approve verifier request (full page inside app shell)
-export function Screen04Share({
-  onNext,
-  onAfterDeny,
-  selectedRequest,
-  setAttestationData,
-}: {
-  onNext: () => void;
-  /** After successful deny API — return user to Requests tab */
-  onAfterDeny: () => void;
-  selectedRequest: VerificationRequest | null;
-  setAttestationData: (data: AttestationData) => void;
-}) {
-  const { storedImageData, setStoredImageData } = useDokimosApp();
-  const [submitting, setSubmitting] = useState(false);
-  const reviewFileRef = useRef<HTMLInputElement>(null);
+/** Plus Jakarta — matches Airbnb request modal / marketing (`--font-landing-sans`). */
+const RECEIPT_SANS = "var(--font-landing-sans), system-ui, sans-serif" as const;
 
-  const onReviewPickFile = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    const ALLOWED = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-    if (!ALLOWED.includes(file.type.toLowerCase())) {
-      alert("Please choose a JPG, PNG, or WebP image.");
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      alert("Image must be 10MB or smaller.");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      const base64 = dataUrl.split(",")[1];
-      setStoredImageData(base64);
-      try {
-        localStorage.setItem("dokimos_stored_image", base64);
-      } catch {
-        /* ignore */
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleApprove = async () => {
-    if (!selectedRequest || !storedImageData) {
-      console.error("Missing request or image data");
-      return;
-    }
-
-    setSubmitting(true);
-
-    try {
-      const response = await axios.post("/api/approve-request", {
-        requestId: selectedRequest.requestId,
-        approved: true,
-        imageBase64: storedImageData,
-      });
-
-      // Store the attestation data
-      if (response.data.attestation) {
-        setAttestationData(response.data.attestation);
-      }
-
-      onNext(); // Navigate to receipt
-    } catch (error) {
-      console.error("Failed to approve request:", error);
-      alert("Failed to approve request. Please try again.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDeny = async () => {
-    if (!selectedRequest) return;
-
-    setSubmitting(true);
-
-    try {
-      await axios.post("/api/approve-request", {
-        requestId: selectedRequest.requestId,
-        approved: false,
-      });
-
-      onAfterDeny();
-    } catch (error) {
-      console.error("Failed to deny request:", error);
-      alert("Failed to deny request. Please try again.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const getRelativeTime = (timestamp: string) => {
-    const now = new Date();
-    const then = new Date(timestamp);
-    const diffMs = now.getTime() - then.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
-    return then.toLocaleString();
-  };
-
-  // Fallback to demo data if no real request
-  const companyName = selectedRequest?.verifierName || "Acme Brokerage";
-  const companyInitial = companyName.charAt(0);
-  const requestedAttrs = selectedRequest?.requestedAttributes || ["name", "ageOver21", "notExpired"];
-  const requestTime = selectedRequest ? getRelativeTime(selectedRequest.createdAt) : "2 minutes ago";
-  const wfLabel = workflowDisplayName(selectedRequest?.workflow);
-
-  return (
-    <div className="relative w-full px-4 pb-8 pt-4 sm:px-5 md:px-6 md:pb-10">
-      <input
-        ref={reviewFileRef}
-        type="file"
-        accept="image/jpeg,image/jpg,image/png,image/webp"
-        className="sr-only"
-        tabIndex={-1}
-        onChange={onReviewPickFile}
-        aria-hidden
-      />
-      <div className="mx-auto w-full max-w-[600px] rounded-[28px] border border-gray-100/90 bg-white p-5 shadow-[0_4px_24px_rgba(15,23,42,0.06)] sm:p-6">
-        {/* Company header with trust badge */}
-        <div className="mb-3 flex items-start gap-3">
-          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium flex-shrink-0">
-            {companyInitial}
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <p
-                className="text-xl font-bold leading-tight text-gray-900 sm:text-2xl md:text-[28px]"
-                style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}
-              >
-                {companyName}
-              </p>
-              <div className="px-2 py-0.5 bg-blue-50 border border-blue-200 rounded text-[10px] font-medium text-blue-700">
-                Verified Partner
-              </div>
-            </div>
-            <p className="text-[13px] text-gray-500 mb-1" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
-              {wfLabel}
-            </p>
-            <p className="text-[11px] text-gray-400" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>Requested {requestTime}</p>
-          </div>
-        </div>
-
-        <div className="w-full h-px bg-gray-200 my-4" />
-
-        {/* Attributes list - no label, larger text */}
-        <div className="space-y-0 mb-4">
-          {requestedAttrs.map((attr, idx) => (
-            <div key={idx} className="py-3.5 border-b border-gray-100">
-              <p className="text-[16px] font-semibold text-gray-900" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
-                {formatVerificationAttributeKey(attr)}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        {/* Combined trust and consent message */}
-        <div className="mb-3 bg-[#F0FDF4] rounded-lg p-3.5 flex items-start gap-2.5">
-          <Shield size={17} className="text-emerald-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-[13px] text-gray-700 leading-relaxed" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
-              {companyName} receives proof you meet these {requestedAttrs.length} requirements. They cannot see your ID photo or any other personal details.
-            </p>
-            <p className="text-[11px] text-emerald-700 mt-1.5 font-medium" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
-              Verified by Intel TDX Secure Enclave
-            </p>
-          </div>
-        </div>
-
-        <div className="mb-4 rounded-xl border border-dashed border-gray-200 bg-gray-50/80 p-4">
-          <p className="mb-2 text-[13px] font-medium text-gray-800" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
-            Government ID
-          </p>
-          {storedImageData ? (
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-[13px] text-emerald-700" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
-                ID image ready for this approval.
-              </p>
-              <button
-                type="button"
-                onClick={() => reviewFileRef.current?.click()}
-                className="text-[13px] font-semibold text-dokimos-accent underline-offset-2 hover:underline"
-                style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
-              >
-                Change photo
-              </button>
-            </div>
-          ) : (
-            <>
-              <p className="mb-3 text-[12px] text-gray-500" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
-                Choose a photo of your ID. On your phone, you can take a picture or pick from your library.
-              </p>
-              <button
-                type="button"
-                onClick={() => reviewFileRef.current?.click()}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-dokimos-accent py-3 text-[15px] font-semibold text-white hover:bg-dokimos-accentHover"
-                style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
-              >
-                <ImagePlus size={18} strokeWidth={2} />
-                Choose photo
-              </button>
-            </>
-          )}
-        </div>
-
-        <button
-          onClick={handleApprove}
-          disabled={submitting || !storedImageData}
-          className="mt-2 flex h-12 min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-dokimos-accent text-sm font-semibold text-white transition-colors hover:bg-dokimos-accentHover disabled:opacity-50 sm:h-14 sm:text-[15px]"
-          style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
-        >
-          <Shield size={16} className="text-white" />
-          {submitting ? "Approving..." : "Approve and Share"}
-        </button>
-
-        <button 
-          onClick={handleDeny}
-          disabled={submitting}
-          className="mt-3 h-12 min-h-[44px] w-full rounded-xl border border-gray-200 bg-white text-sm font-semibold text-[#EF4444] transition-colors hover:bg-gray-50 disabled:opacity-50 sm:h-14 sm:text-[15px]"
-          style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
-        >
-          {submitting ? "Processing..." : "Deny"}
-        </button>
-      </div>
-    </div>
-  );
-}
+/** Same shell as {@link RequestNotificationModal} (600px card on dim backdrop). */
+const REQUEST_STYLE_MODAL_PANEL =
+  "max-h-[min(90vh,calc(100dvh-2rem))] w-full max-w-[600px] overflow-y-auto rounded-[20px] border border-slate-200/90 bg-white px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 shadow-2xl";
 
 // Screen 05 - Verification Receipt with REAL attestation data
 export function Screen05Receipt({ 
@@ -1356,21 +1078,42 @@ export function Screen05Receipt({
     : "April 1, 2026";
 
   return (
-    <div className="relative w-full">
-      <div className="mx-auto max-w-[600px] px-4 pb-8 pt-6 sm:px-5 md:px-6 md:pb-10">
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4"
+      role="presentation"
+    >
+      <div
+        className={REQUEST_STYLE_MODAL_PANEL}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="receipt-verified-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 flex justify-end">
+          <button
+            type="button"
+            onClick={onBack}
+            className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
+            aria-label="Close"
+          >
+            <X size={22} />
+          </button>
+        </div>
+        <div style={{ fontFamily: RECEIPT_SANS }}>
         <h1
           className="text-center text-[17px] font-bold text-[#0F1B4C]"
-          style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+          style={{ fontFamily: RECEIPT_SANS }}
         >
           Dokimos
         </h1>
 
-      <div className="mt-6 flex flex-col items-center px-0 pb-4 sm:mt-8">
-        <div className="w-20 h-20 rounded-full bg-emerald-600 flex items-center justify-center mb-5">
+      <div className="mt-4 flex flex-col items-center px-0 pb-2 sm:mt-5">
+        <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-600">
           <Check size={40} className="text-white" />
         </div>
 
         <h2
+          id="receipt-verified-title"
           className="mb-4 text-4xl font-bold text-emerald-600 sm:text-5xl md:text-[56px]"
           style={{ fontFamily: "var(--font-instrument-serif), Georgia, serif" }}
         >
@@ -1381,30 +1124,30 @@ export function Screen05Receipt({
 
         <p
           className="mb-2 text-center text-lg font-medium text-gray-900 sm:text-[22px]"
-          style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+          style={{ fontFamily: RECEIPT_SANS }}
         >
           Shared with {companyName}
         </p>
-        <p className="text-[13px] text-gray-500 mb-4" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
+        <p className="mb-4 text-[13px] text-gray-500" style={{ fontFamily: RECEIPT_SANS }}>
           Verified on {timestamp}
         </p>
 
         {/* Eigen Branding Badge */}
         <div className="mb-6 w-full rounded-xl border border-teal-200 bg-gradient-to-r from-teal-50 to-slate-50 p-4">
-          <div className="flex items-center gap-3 mb-2">
+          <div className="mb-2 flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-dokimos-accent">
-              <Shield className="w-6 h-6 text-white" />
+              <Shield className="h-6 w-6 text-white" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-teal-900" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
+              <p className="text-sm font-semibold text-teal-900" style={{ fontFamily: RECEIPT_SANS }}>
                 Powered by EigenCompute
               </p>
-              <p className="text-xs text-teal-700" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
+              <p className="text-xs text-teal-700" style={{ fontFamily: RECEIPT_SANS }}>
                 Intel TDX Trusted Execution Environment
               </p>
             </div>
           </div>
-          <p className="text-xs leading-relaxed text-teal-800" style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
+          <p className="text-xs leading-relaxed text-teal-800" style={{ fontFamily: RECEIPT_SANS }}>
             This verification ran in secure hardware. The cryptographic proof can be independently verified by anyone using Eigen's attestation infrastructure.
           </p>
         </div>
@@ -1413,6 +1156,7 @@ export function Screen05Receipt({
           type="button"
           onClick={() => setAccordionOpen(!accordionOpen)}
           className="mb-4 flex h-12 min-h-[44px] w-full items-center justify-between rounded-xl border border-gray-200 px-4"
+          style={{ fontFamily: RECEIPT_SANS }}
         >
           <span className="text-[15px] font-medium text-gray-900">How is this verified?</span>
           <span className={`transform transition-transform ${accordionOpen ? "rotate-180" : ""}`}>▼</span>
@@ -1422,7 +1166,8 @@ export function Screen05Receipt({
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
-            className="w-full mb-4 px-4 text-[14px] text-gray-600 leading-relaxed"
+            className="mb-4 w-full px-1 text-[14px] leading-relaxed text-gray-600"
+            style={{ fontFamily: RECEIPT_SANS }}
           >
             This attestation was generated by code running inside an Intel TDX Trusted Execution Environment. 
             The signature below was produced by a wallet that only that specific, auditable code can access. 
@@ -1440,10 +1185,11 @@ export function Screen05Receipt({
               })}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full h-12 border border-gray-200 rounded-xl px-4 flex items-center justify-between mb-3 hover:bg-gray-50 transition-colors"
+              className="mb-3 flex h-12 w-full items-center justify-between rounded-xl border border-gray-200 px-4 transition-colors hover:bg-gray-50"
+              style={{ fontFamily: RECEIPT_SANS }}
             >
               <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded-full bg-gray-200" />
+                <div className="h-5 w-5 rounded-full bg-gray-200" />
                 <span className="text-[14px] font-medium text-gray-900">Verify Signature on Etherscan</span>
               </div>
               <ExternalLink size={16} className="text-dokimos-accent" />
@@ -1456,10 +1202,11 @@ export function Screen05Receipt({
               }
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full h-12 border border-gray-200 rounded-xl px-4 flex items-center justify-between mb-6 hover:bg-gray-50 transition-colors"
+              className="mb-6 flex h-12 w-full items-center justify-between rounded-xl border border-gray-200 px-4 transition-colors hover:bg-gray-50"
+              style={{ fontFamily: RECEIPT_SANS }}
             >
               <div className="flex items-center gap-2">
-                <div className="w-5 h-5 bg-[#0F1B4C] rounded" />
+                <div className="h-5 w-5 rounded bg-[#0F1B4C]" />
                 <span className="text-[14px] font-medium text-gray-900">View Code on EigenCloud Dashboard</span>
               </div>
               <ExternalLink size={16} className="text-dokimos-accent" />
@@ -1467,40 +1214,48 @@ export function Screen05Receipt({
           </>
         )}
 
-        <div className="w-full bg-[#0F1B4C] rounded-xl p-4 relative">
-          <button className="absolute top-4 right-4 text-[11px] text-gray-400 hover:text-gray-300">
+        <div className="relative w-full rounded-xl bg-[#0F1B4C] p-4">
+          <button
+            type="button"
+            className="absolute right-4 top-4 text-[11px] text-gray-400 hover:text-gray-300"
+            style={{ fontFamily: RECEIPT_SANS }}
+          >
             <Copy size={12} className="inline" /> Copy all
           </button>
           {attestationData ? (
             <pre className="text-[11px] font-mono overflow-x-auto whitespace-pre-wrap break-all">
               <span className="text-gray-400">message:</span> <span className="text-gray-200">{attestationData.message}</span>{"\n"}
               <span className="text-gray-400">messageHash:</span> <span className="text-gray-200">{truncate(attestationData.messageHash, 6)}</span>{"\n"}
-              <span className="text-gray-400">signature:</span> <span className="text-teal-600">{truncate(attestationData.signature, 8)}</span>{"\n"}
-              <span className="text-gray-400">signer:</span> <span className="text-teal-600">{truncate(attestationData.signer, 6)}</span>
+              <span className="text-gray-400">hash:</span> <span className="text-teal-600">{truncate(attestationData.signature, 8)}</span>{"\n"}
+              <span className="text-gray-400">address:</span> <span className="text-teal-600">{truncate(attestationData.signer, 6)}</span>
             </pre>
           ) : (
             <pre className="text-[11px] font-mono overflow-x-auto">
               <span className="text-gray-400">message:</span> <span className="text-gray-200">Age Over 21</span>{"\n"}
               <span className="text-gray-400">messageHash:</span> <span className="text-gray-200">0x7f9a3b...8f9a</span>{"\n"}
-              <span className="text-gray-400">signature:</span> <span className="text-teal-600">0x8a4c5e...3c4d</span>{"\n"}
-              <span className="text-gray-400">signer:</span> <span className="text-teal-600">0x2b5f8c...5f8a</span>
+              <span className="text-gray-400">hash:</span> <span className="text-teal-600">0x8a4c5e...3c4d</span>{"\n"}
+              <span className="text-gray-400">address:</span> <span className="text-teal-600">0x2b5f8c...5f8a</span>
             </pre>
           )}
         </div>
 
-        <p className="mt-6 text-center text-[11px] text-gray-400">
+        <p
+          className="mt-6 text-center text-[11px] text-gray-400"
+          style={{ fontFamily: RECEIPT_SANS }}
+        >
           Issued by Dokimos · Cryptographic identity infrastructure
         </p>
 
         <button
           type="button"
           onClick={onNext}
-          className="mt-8 h-12 min-h-[44px] w-full max-w-md rounded-xl bg-dokimos-accent text-sm font-semibold text-white transition-colors hover:bg-dokimos-accentHover sm:h-14 sm:text-[15px]"
-          style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+          className="mt-8 h-12 min-h-[44px] w-full rounded-xl bg-dokimos-accent text-sm font-semibold text-white transition-colors hover:bg-dokimos-accentHover sm:h-14 sm:text-[15px]"
+          style={{ fontFamily: RECEIPT_SANS }}
         >
           Done
         </button>
       </div>
+        </div>
       </div>
     </div>
   );
@@ -1599,13 +1354,14 @@ export function Screen06History({
 
   const displayTime = (r: VerificationRequest) => {
     const ts = r.status === "pending" ? r.createdAt : r.completedAt || r.createdAt;
-    return formatActivityRelative(ts);
+    return formatVerificationActivityRelativeTime(ts);
   };
 
   const pendingList = useMemo(
     () =>
       requests
         .filter((r) => r.status === "pending")
+        .filter((r) => !isExcludedFromConsumerActivityList(r))
         .sort((a, b) => requestSortDate(b) - requestSortDate(a)),
     [requests]
   );
@@ -1613,6 +1369,7 @@ export function Screen06History({
   const completedFiltered = useMemo(() => {
     return requests
       .filter((r) => r.status !== "pending")
+      .filter((r) => !isExcludedFromConsumerActivityList(r))
       .filter((r) => matchesActivityFilter(r, timeFilter))
       .sort((a, b) => requestSortDate(b) - requestSortDate(a));
   }, [requests, timeFilter]);
@@ -1827,20 +1584,3 @@ export function Screen06History({
   );
 }
 
-function formatActivityRelative(timestamp: string): string {
-  const now = new Date();
-  const then = new Date(timestamp);
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const startOfThen = new Date(then.getFullYear(), then.getMonth(), then.getDate());
-  const calendarDiffDays = Math.round(
-    (startOfToday.getTime() - startOfThen.getTime()) / 86400000
-  );
-
-  if (calendarDiffDays === 0) return "Today";
-  if (calendarDiffDays === 1) return "Yesterday";
-  if (calendarDiffDays < 7) {
-    return `${calendarDiffDays} day${calendarDiffDays > 1 ? "s" : ""} ago`;
-  }
-
-  return then.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}

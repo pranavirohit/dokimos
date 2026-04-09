@@ -10,7 +10,11 @@ import {
   type ReactNode,
 } from "react";
 import type { AttestationData, VerificationRequest } from "@/types/dokimos";
-import { STORAGE_ATTESTATION, STORAGE_ONBOARDING_COMPLETE } from "@/types/dokimos";
+import {
+  STORAGE_ATTESTATION,
+  STORAGE_ID_IMAGE,
+  STORAGE_ONBOARDING_COMPLETE,
+} from "@/types/dokimos";
 
 type DokimosAppContextValue = {
   attestationData: AttestationData | null;
@@ -58,7 +62,30 @@ export function DokimosAppProvider({ children }: { children: ReactNode }) {
       console.error("Failed to parse stored attestation:", err);
     }
   }, []);
-  const [storedImageData, setStoredImageData] = useState<string | null>(null);
+
+  const [storedImageData, setStoredImageDataState] = useState<string | null>(null);
+
+  const setStoredImageData = useCallback((v: string | null) => {
+    setStoredImageDataState(v);
+    try {
+      if (typeof window !== "undefined") {
+        if (v) localStorage.setItem(STORAGE_ID_IMAGE, v);
+        else localStorage.removeItem(STORAGE_ID_IMAGE);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const img = localStorage.getItem(STORAGE_ID_IMAGE);
+      if (img) setStoredImageDataState(img);
+    } catch {
+      /* ignore */
+    }
+  }, []);
   const [selectedRequest, setSelectedRequest] =
     useState<VerificationRequest | null>(null);
 

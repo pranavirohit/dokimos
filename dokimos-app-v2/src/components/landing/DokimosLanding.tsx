@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
-  Check,
   ChevronRight,
   Code2,
   Fingerprint,
@@ -236,17 +235,14 @@ function HeroVisual() {
               Identity vault
             </p>
             <p className="mt-3 text-[22px] font-bold text-slate-900">Verified</p>
-            <div className="mt-4 flex items-center gap-2 text-[12px] font-medium text-emerald-600">
-              <Check className="h-4 w-4" strokeWidth={2.5} />
-              Face matched to ID
-            </div>
+            <p className="mt-4 text-[12px] font-medium text-slate-600">Janice Sample</p>
           </div>
           <div className="rounded-2xl border border-amber-200/60 bg-gradient-to-br from-amber-50 to-orange-50/80 p-4 shadow-[0_8px_24px_rgba(251,191,36,0.12)]">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-900/80">
               Pending request
             </p>
             <p className="mt-2 text-[14px] font-semibold text-slate-900">Acme Corp</p>
-            <p className="mt-1 text-[12px] text-slate-600">3 attributes requested</p>
+            <p className="mt-1 text-[12px] text-slate-600">3 fields requested</p>
             <div className="mt-4 h-9 rounded-xl bg-gradient-to-r from-slate-800 to-teal-900 text-center text-[12px] font-semibold leading-9 text-white shadow-[0_6px_20px_rgba(15,23,42,0.35)]">
               Review
             </div>

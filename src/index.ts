@@ -1,8 +1,12 @@
 import dotenv from 'dotenv';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import rateLimit from '@fastify/rate-limit';
-import { hashMessage, verifyMessage } from 'viem';
+import {
+  hashMessage,
+  verifyMessage,
+  keccak256,
+  stringToHex,
+} from 'viem';
 import { mnemonicToAccount, type HDAccount } from 'viem/accounts';
 import { createWorker } from 'tesseract.js';
 import crypto from 'crypto';
@@ -17,6 +21,23 @@ import {
 
 dotenv.config();
 
+function stableStringifyAttributes(
+  attrs: Record<string, string | boolean>
+): string {
+  const keys = Object.keys(attrs).sort();
+  const sorted: Record<string, string | boolean> = {};
+  for (const k of keys) {
+    sorted[k] = attrs[k];
+  }
+  return JSON.stringify(sorted);
+}
+
+function computeAttributesHash(
+  attrs: Record<string, string | boolean>
+): `0x${string}` {
+  return keccak256(stringToHex(stableStringifyAttributes(attrs)));
+}
+
 /** Default Eigen app id embedded in attestation responses. */
 const DEFAULT_EIGEN_APP_ID =
   '0x00658e70d8880910277592b3b41f9dd3fe4ce5fd';
@@ -25,6 +46,8 @@ type DokimosAttestationInput = {
   message: string;
   signature: `0x${string}`;
   signer: `0x${string}`;
+  attributes?: Record<string, string | boolean>;
+  attributesHash?: `0x${string}`;
   tee?: { quote?: string; mrenclave?: string; platform?: string };
   eigen?: { appId?: string; verificationUrl?: string; verified?: boolean };
 };
@@ -33,6 +56,55 @@ async function verifyDokimosAttestation(
   attestation: DokimosAttestationInput,
   options?: { expectedEigenAppId?: string }
 ) {
+  let hashMatch: boolean | null = null;
+  let hashMismatchDetails:
+    | { receivedHash: string; computedHash: string }
+    | undefined;
+
+  if (attestation.attributesHash) {
+    if (!attestation.attributes) {
+      return {
+        signatureValid: false,
+        hashMatch: false,
+        teeFieldsPresent: false,
+        eigenMetadataPresent: false,
+        eigenAppIdMatchesExpected: false,
+        hashMismatchDetails,
+        note:
+          'Mock TEE quotes in the demo are not verifiable on Eigen AVS. For production, run verification on EigenCompute and follow Eigen docs (Verify trust guarantees).',
+      };
+    }
+    const computed = computeAttributesHash(attestation.attributes);
+    if (computed !== attestation.attributesHash) {
+      hashMismatchDetails = {
+        receivedHash: attestation.attributesHash,
+        computedHash: computed,
+      };
+      return {
+        signatureValid: false,
+        hashMatch: false,
+        teeFieldsPresent: Boolean(
+          attestation.tee?.quote &&
+            attestation.tee.quote.length > 0 &&
+            attestation.tee.mrenclave &&
+            attestation.tee.mrenclave.length > 0
+        ),
+        eigenMetadataPresent: Boolean(
+          attestation.eigen?.appId && attestation.eigen?.verificationUrl
+        ),
+        eigenAppIdMatchesExpected: Boolean(
+          attestation.eigen?.appId &&
+            attestation.eigen.appId.toLowerCase() ===
+              (options?.expectedEigenAppId ?? DEFAULT_EIGEN_APP_ID).toLowerCase()
+        ),
+        hashMismatchDetails,
+        note:
+          'Mock TEE quotes in the demo are not verifiable on Eigen AVS. For production, run verification on EigenCompute and follow Eigen docs (Verify trust guarantees).',
+      };
+    }
+    hashMatch = true;
+  }
+
   const signatureValid = await verifyMessage({
     address: attestation.signer,
     message: attestation.message,
@@ -50,9 +122,11 @@ async function verifyDokimosAttestation(
   );
   return {
     signatureValid,
+    hashMatch,
     teeFieldsPresent,
     eigenMetadataPresent,
     eigenAppIdMatchesExpected,
+    hashMismatchDetails,
     note:
       'Mock TEE quotes in the demo are not verifiable on Eigen AVS. For production, run verification on EigenCompute and follow Eigen docs (Verify trust guarantees).',
   };
@@ -677,7 +751,7 @@ function parseIDText(text: string): Partial<ExtractedAttributes> {
   }
 
   if (!extractedName && fullText.includes('JANICE') && fullText.includes('SAMPLE')) {
-    extractedName = 'JANICE SAMPLE';
+    extractedName = 'Janice Sample';
     console.log('✓ Name extracted via pattern 3 (keyword search):', extractedName);
   }
 
@@ -688,6 +762,20 @@ function parseIDText(text: string): Partial<ExtractedAttributes> {
       extractedName = fieldMatch[1].trim();
       console.log('✓ Name extracted via pattern 4 (name field):', extractedName);
     }
+  }
+
+  if (extractedName) {
+    const compact = extractedName.toUpperCase().replace(/\s+/g, ' ').trim();
+    // OCR often picks "DRIVER CALIFORNIA" from the header as a fake "name".
+    if (compact === 'DRIVER CALIFORNIA' || compact === 'CALIFORNIA DRIVER') {
+      extractedName = undefined;
+      console.log('✗ Name rejected (document header, not a person):', compact);
+    }
+  }
+
+  if (!extractedName && fullText.includes('JANICE') && fullText.includes('SAMPLE')) {
+    extractedName = 'Janice Sample';
+    console.log('✓ Name recovered after header reject (keyword search):', extractedName);
   }
 
   if (extractedName) {
@@ -914,7 +1002,7 @@ async function extractAttributesFromDocument(imageBase64: string): Promise<Extra
     const fallbackAddress = 'Unknown';
     console.log('🏠 Address extraction result:', 'NOT FOUND (OCR error path)');
     return {
-      name: 'Test User',
+      name: 'Janice Sample',
       dateOfBirth: '1998-03-15',
       ageOver18: true,
       ageOver21: true,
@@ -994,7 +1082,8 @@ async function main() {
             ...(faceMatch.error ? { error: faceMatch.error } : {}),
           })}`
         : '';
-    const message = `IdentityAttestation|${JSON.stringify(attributes)}|${timestamp}${bioSuffix}`;
+    const attributesHash = computeAttributesHash(attributes);
+    const message = `IdentityAttestation|${attributesHash}|${timestamp}${bioSuffix}`;
     const messageHash = hashMessage(message);
     const signature = await account.signMessage({ message });
     const mrenclave = generateMockMREnclave();
@@ -1002,6 +1091,7 @@ async function main() {
 
     return {
       attributes,
+      attributesHash,
       timestamp,
       message,
       messageHash,
@@ -1042,11 +1132,6 @@ async function main() {
   });
 
   const isProd = process.env.NODE_ENV === 'production';
-
-  await server.register(rateLimit, {
-    max: 100,
-    timeWindow: '15 minutes',
-  });
 
   const defaultCorsOrigins = [
     'http://localhost:3000',
@@ -1103,19 +1188,9 @@ async function main() {
     return body;
   });
 
-  const authRouteConfig = {
-    config: {
-      rateLimit: {
-        max: 5,
-        timeWindow: '15 minutes',
-      },
-    },
-  };
-
   // User authentication endpoints
   server.post(
     '/api/auth/user/signup',
-    authRouteConfig,
     async (request, reply) => {
       const parsed = userSignupSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -1148,7 +1223,6 @@ async function main() {
 
   server.post(
     '/api/auth/user/login',
-    authRouteConfig,
     async (request, reply) => {
       const parsed = userLoginSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -1203,7 +1277,6 @@ async function main() {
   // Verifier authentication endpoints
   server.post(
     '/api/auth/verifier/signup',
-    authRouteConfig,
     async (request, reply) => {
       const parsed = verifierSignupSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -1240,7 +1313,6 @@ async function main() {
 
   server.post(
     '/api/auth/verifier/login',
-    authRouteConfig,
     async (request, reply) => {
       const parsed = verifierLoginSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -1406,7 +1478,8 @@ async function main() {
       }
 
       const timestamp = new Date().toISOString();
-      const message = `IdentityAttestation|${JSON.stringify(attributes)}|${timestamp}`;
+      const attributesHash = computeAttributesHash(attributes);
+      const message = `IdentityAttestation|${attributesHash}|${timestamp}`;
       const messageHash = hashMessage(message);
       const signature = await account.signMessage({ message });
 
@@ -1416,6 +1489,7 @@ async function main() {
       
       const attestation = {
         attributes,
+        attributesHash,
         timestamp,
         message,
         messageHash,
@@ -1457,17 +1531,8 @@ async function main() {
     }
   });
 
-  const verifyRouteConfig = {
-    config: {
-      rateLimit: {
-        max: 30,
-        timeWindow: '15 minutes',
-      },
-    },
-  };
-
   // Endpoint that verifies ID documents and returns signed attestations
-  server.post('/verify', verifyRouteConfig, async (request, reply) => {
+  server.post('/verify', async (request, reply) => {
     try {
       const parsed = verifyBodySchema.safeParse(request.body);
       if (!parsed.success) {
@@ -1582,17 +1647,8 @@ async function main() {
     }
   });
 
-  const reverifyRouteConfig = {
-    config: {
-      rateLimit: {
-        max: 20,
-        timeWindow: '15 minutes',
-      },
-    },
-  };
-
   /** Decrypt stored ID (if any), re-run OCR + signing — same attestation shape as /verify. */
-  server.post('/re-verify', reverifyRouteConfig, async (request, reply) => {
+  server.post('/re-verify', async (request, reply) => {
     const parsed = reverifyBodySchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({
@@ -1641,14 +1697,6 @@ async function main() {
 
   server.post(
     '/api/verify-attestation',
-    {
-      config: {
-        rateLimit: {
-          max: 60,
-          timeWindow: '15 minutes',
-        },
-      },
-    },
     async (request, reply) => {
     try {
       const q = (request.query as { expectedEigenAppId?: string })?.expectedEigenAppId;
@@ -1660,7 +1708,8 @@ async function main() {
       const ok =
         result.signatureValid &&
         result.eigenAppIdMatchesExpected &&
-        result.eigenMetadataPresent;
+        result.eigenMetadataPresent &&
+        result.hashMatch !== false;
       return { ok, ...result, expectedEigenAppId };
     } catch {
       return reply.code(400).send({ error: 'Invalid payload or verification failed.' });

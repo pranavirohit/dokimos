@@ -1,4 +1,5 @@
 import type { VerificationRequest } from "@/types/dokimos";
+import { labelForVaultAttributeKey } from "@/lib/vaultAttributes";
 
 const COMPANY_BADGE_COLORS = [
   "#0d9488",
@@ -19,28 +20,24 @@ export function getCompanyBadgeColor(name: string): string {
   return COMPANY_BADGE_COLORS[Math.abs(hash) % COMPANY_BADGE_COLORS.length];
 }
 
-/** Human-readable label for a TEE / request attribute key. */
+/** Human-readable label for a TEE / request attribute key (Title Case, shared with vault rows). */
 export function formatVerificationAttributeKey(attr: string): string {
-  const map: Record<string, string> = {
-    ageOver21: "Age Over 21",
-    ageOver18: "Age Over 18",
-    name: "Full Name",
-    fullName: "Full Name",
-    dateOfBirth: "Date of Birth",
-    nationality: "Nationality",
-    notExpired: "Document not expired",
-    documentNotExpired: "Document not expired",
-    documentType: "Document Type",
-    documentExpiryDate: "Document Expiry Date",
-    address: "Address",
-  };
-  return map[attr] || attr;
+  return labelForVaultAttributeKey(attr);
+}
+
+/** When both are present, the expiry date row supersedes the boolean “not expired” flag. */
+export function dedupeAttributeKeysForDisplay(keys: string[]): string[] {
+  if (keys.includes("documentExpiryDate") && keys.includes("notExpired")) {
+    return keys.filter((k) => k !== "notExpired");
+  }
+  return keys;
 }
 
 /**
  * For approved rows with attestation, prefer keys present in the proof; else requested attributes.
  */
 export function getDisplayedAttributeKeys(request: VerificationRequest): string[] {
+  let keys: string[];
   if (
     request.status === "approved" &&
     request.attestation &&
@@ -48,9 +45,23 @@ export function getDisplayedAttributeKeys(request: VerificationRequest): string[
   ) {
     const att = request.attestation as { attributes?: Record<string, unknown> };
     if (att.attributes && typeof att.attributes === "object") {
-      const keys = Object.keys(att.attributes);
-      if (keys.length > 0) return keys;
-    }
-  }
-  return request.requestedAttributes ?? [];
+      const fromAtt = Object.keys(att.attributes);
+      if (fromAtt.length > 0) keys = fromAtt;
+      else keys = request.requestedAttributes ?? [];
+    } else keys = request.requestedAttributes ?? [];
+  } else keys = request.requestedAttributes ?? [];
+  return dedupeAttributeKeysForDisplay(keys);
+}
+
+/** Legacy / demo verifiers omitted from consumer Activity lists. */
+const EXCLUDED_FROM_CONSUMER_ACTIVITY_VERIFIERS = new Set([
+  "Acme Brokerage",
+  "Binance",
+]);
+
+export function isExcludedFromConsumerActivityList(
+  request: VerificationRequest
+): boolean {
+  const name = (request.verifierName ?? "").trim();
+  return EXCLUDED_FROM_CONSUMER_ACTIVITY_VERIFIERS.has(name);
 }

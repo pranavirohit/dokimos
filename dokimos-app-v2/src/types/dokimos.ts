@@ -3,6 +3,8 @@ export type DokimosAppTab = "vault" | "activity" | "settings";
 
 export interface AttestationData {
   attributes: Record<string, string | boolean>;
+  /** keccak256 (hex) of stable JSON over `attributes` — matches what is signed in `message`. Omitted on legacy stored attestations. */
+  attributesHash?: `0x${string}`;
   timestamp: string;
   message: string;
   messageHash: string;
@@ -49,6 +51,9 @@ export const STORAGE_EXPLAINER_SEEN = "dokimos_explainer_seen";
 
 /** First vault visit after onboarding — “What just happened?” modal; show once per browser profile. */
 export const STORAGE_POST_VERIFICATION_EXPLAINER_SEEN = "dokimos_post_verification_explainer_seen";
+
+/** Raw ID image base64 from onboarding — used for approve-request and should hydrate app context on load. */
+export const STORAGE_ID_IMAGE = "dokimos_stored_image";
 
 /** Live selfie JPEG (data URL) for POST /verify face match — cleared after success. */
 export const STORAGE_LIVE_PHOTO = "dokimos_live_photo";

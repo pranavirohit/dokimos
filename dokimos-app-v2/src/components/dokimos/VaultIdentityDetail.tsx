@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Check, XCircle } from "lucide-react";
+import { Check } from "lucide-react";
 import { VaultCredentialRowList } from "@/components/dokimos/VaultVerifiedAttributeList";
 import {
   VAULT_DEMO_ATTRIBUTES,
@@ -118,35 +118,6 @@ export function VaultIdentityDetail({
                 ) : null}
               </div>
             </div>
-
-            {attestationData?.biometricVerification ? (
-              <div
-                className={`mt-4 flex items-start gap-3 rounded-xl border px-3 py-3 sm:px-4 ${
-                  attestationData.biometricVerification.faceMatch
-                    ? "border-emerald-200/80 bg-white"
-                    : "border-amber-200 bg-amber-50/70"
-                }`}
-              >
-                {attestationData.biometricVerification.faceMatch ? (
-                  <Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" strokeWidth={2.5} />
-                ) : (
-                  <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" strokeWidth={2.5} />
-                )}
-                <div className="min-w-0">
-                  <p className="text-[14px] font-semibold text-slate-900" style={{ fontFamily: sans }}>
-                    {attestationData.biometricVerification.faceMatch
-                      ? "Face matched to ID"
-                      : "Face match check did not pass"}
-                  </p>
-                  <p className="mt-1 text-[12px] text-slate-600" style={{ fontFamily: sans }}>
-                    Confidence {(attestationData.biometricVerification.confidence * 100).toFixed(1)}%
-                    {attestationData.biometricVerification.error
-                      ? ` — ${attestationData.biometricVerification.error}`
-                      : ""}
-                  </p>
-                </div>
-              </div>
-            ) : null}
           </div>
 
           <VaultCredentialRowList

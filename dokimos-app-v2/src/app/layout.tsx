@@ -44,10 +44,10 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} ${plusJakarta.variable} font-sans antialiased`}
+      className={`h-full ${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} ${plusJakarta.variable} font-sans antialiased`}
     >
       <body
-        className={`${geistSans.className} min-h-[100dvh] bg-[var(--dokimos-bg-secondary)] font-sans text-[var(--dokimos-text-primary)]`}
+        className={`${geistSans.className} flex h-full min-h-[100dvh] flex-col bg-[var(--dokimos-bg-secondary)] font-sans text-[var(--dokimos-text-primary)]`}
       >
         <SessionProvider>
           <DokimosAppProvider>{children}</DokimosAppProvider>

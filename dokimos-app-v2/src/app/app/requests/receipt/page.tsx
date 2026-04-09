@@ -11,7 +11,7 @@ export default function RequestReceiptPage() {
   return (
     <Screen05Receipt
       onNext={() => router.push("/app/vault")}
-      onBack={() => router.push("/app/requests")}
+      onBack={() => router.push("/app/vault")}
       attestationData={attestationData}
       selectedRequest={selectedRequest}
     />

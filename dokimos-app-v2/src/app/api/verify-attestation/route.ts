@@ -23,7 +23,8 @@ export async function POST(request: NextRequest) {
     const ok =
       result.signatureValid &&
       result.eigenAppIdMatchesExpected &&
-      result.eigenMetadataPresent;
+      result.eigenMetadataPresent &&
+      result.hashMatch !== false;
 
     return NextResponse.json({
       ok,

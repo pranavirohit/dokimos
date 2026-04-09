@@ -236,8 +236,9 @@ const verification = await response.json();
     "documentType": "drivers_license",
     "notExpired": true
   },
+  "attributesHash": "0x8f3b2c1a4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2",
   "timestamp": "2026-04-02T22:15:30.123Z",
-  "message": "IdentityAttestation|{\\"ageOver21\\":true,...}|2026-04-02T...",
+  "message": "IdentityAttestation|0x8f3b2c1a4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2|2026-04-02T22:15:30.123Z",
   "messageHash": "0x8fb10cc1a5c3d8e2f9b4a7c6d5e8f1a2b3c4d5e6...",
   "signature": "0x429b783a4e41f0532fff356fb7a21a3fdac59726...",
   "signer": "0x2E5100a47aE27a71F389bce2588cB2473b94d2d9",

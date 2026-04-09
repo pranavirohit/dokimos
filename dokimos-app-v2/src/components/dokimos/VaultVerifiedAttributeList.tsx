@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { Check } from "lucide-react";
-import { VAULT_ATTR_LABELS, formatVaultAttributeDisplay } from "@/lib/vaultAttributes";
+import { formatVaultAttributeDisplay, labelForVaultAttributeKey } from "@/lib/vaultAttributes";
 
 type RowProps = {
   label: string;
@@ -79,12 +79,12 @@ export function VaultCredentialRowList({
     hasPrimaryBlock ? (
       <div className="divide-y divide-slate-100">
         {primaryEntries.map(([key, value], idx) => (
-          <CredentialRow key={`p-${key}-${idx}`} label={VAULT_ATTR_LABELS[key] || key} sans={sans}>
+          <CredentialRow key={`p-${key}-${idx}`} label={labelForVaultAttributeKey(key)} sans={sans}>
             {renderValue(key, value)}
           </CredentialRow>
         ))}
         {documentTypeLabel ? (
-          <CredentialRow label="Document" sans={sans}>
+          <CredentialRow label="Document Type" sans={sans}>
             <span className="text-[15px] font-medium text-slate-900" style={{ fontFamily: sans }}>
               {documentTypeLabel}
             </span>
@@ -109,7 +109,7 @@ export function VaultCredentialRowList({
           {additionalEntries.map(([key, value], idx) => (
             <CredentialRow
               key={`a-${key}-${idx}`}
-              label={VAULT_ATTR_LABELS[key] || key}
+              label={labelForVaultAttributeKey(key)}
               sans={sans}
             >
               {renderValue(key, value)}

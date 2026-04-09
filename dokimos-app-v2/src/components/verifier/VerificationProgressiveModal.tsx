@@ -5,12 +5,15 @@ import {
   CheckCircle,
   ChevronDown,
   ChevronRight,
+  ClipboardCopy,
+  Clock,
   ExternalLink,
   X,
+  XCircle,
 } from "lucide-react";
 import type { VerificationRequest } from "@/types/dokimos";
 import {
-  buildPlainLanguageVerificationRows,
+  buildVerificationSummaryRows,
   getVerificationDisplayName,
 } from "@/lib/verificationPlainLanguage";
 import { getEigenVerificationDashboardUrl } from "@/lib/eigenUrls";
@@ -61,10 +64,10 @@ export function VerificationProgressiveModal({
   const firstName = firstNameFromDisplay(displayName);
 
   const att = request.attestation as Record<string, unknown> | undefined;
-  const attributes = useMemo(() => {
-    if (!att) return [];
-    return buildPlainLanguageVerificationRows(att, request.userEmail);
-  }, [att, request.userEmail]);
+  const attributes = useMemo(
+    () => buildVerificationSummaryRows(request),
+    [request]
+  );
 
   const verifiedAtIso =
     (att?.timestamp != null ? String(att.timestamp) : "") ||
@@ -77,16 +80,13 @@ export function VerificationProgressiveModal({
     const a = request.attestation as Record<string, unknown> | undefined;
     const sig = a?.signature != null ? String(a.signature) : "";
     const sigAddr = a?.signer != null ? String(a.signer) : "";
-    const msg =
-      a?.messageHash != null
-        ? String(a.messageHash)
-        : a?.userDataHash != null
-          ? String(a.userDataHash)
-          : "";
+    const rawMessage =
+      a?.message != null ? String(a.message) : "";
     const teeInfo = a?.tee as
       | {
           platform?: string;
           enclaveId?: string;
+          mrenclave?: string;
           debugMode?: boolean;
           quote?: string;
           tcbStatus?: string;
@@ -120,32 +120,34 @@ export function VerificationProgressiveModal({
         stepOk: sigStepOk,
         intro:
           "Every attestation has a cryptographic signature—like a tamper-proof seal. You can confirm it matches what ran in secure hardware.",
-        statusLines: [
-          sig
-            ? `Signature: ${truncateMid(sig, 14)}`
-            : "Signature: not present in this payload",
-          sigAddr
-            ? `Signed by: ${truncateMid(sigAddr, 12)} (signing wallet)`
-            : "Signer address: add to verify on-chain",
-          msg ? `Message hash: ${truncateMid(msg, 14)}` : "Message hash: —",
+        statusLines: [],
+        copyFieldRows: [
+          { key: "address", label: "Address", fullCopy: sigAddr },
+          { key: "message", label: "Message", fullCopy: rawMessage },
+          { key: "hash", label: "Hash", fullCopy: sig },
         ],
         whatThisProves: [
           "This attestation has not been altered since it was signed.",
           "It was produced by the expected signing identity (check the wallet on-chain).",
           "The data you see is what was covered by that signature.",
         ],
-        details: [
-          ...(sig ? [{ label: "Signature", value: sig }] : [{ label: "Signature", value: "—" }]),
-          ...(sigAddr ? [{ label: "Signer", value: sigAddr }] : [{ label: "Signer", value: "—" }]),
-          ...(msg ? [{ label: "Message hash", value: msg }] : []),
-        ],
+        details: [],
         link:
-          sigAddr && sig
+          sigAddr && sig && rawMessage
             ? {
                 text: "Verify on Etherscan",
-                href: `https://sepolia.etherscan.io/address/${encodeURIComponent(sigAddr)}`,
+                href: `https://sepolia.etherscan.io/verifiedSignatures?${new URLSearchParams({
+                  a: sigAddr,
+                  m: rawMessage,
+                  s: sig,
+                })}`,
               }
-            : { text: "Open Sepolia Etherscan", href: sepoliaRoot },
+            : sigAddr && sig
+              ? {
+                  text: "Verify on Etherscan",
+                  href: `https://sepolia.etherscan.io/address/${encodeURIComponent(sigAddr)}`,
+                }
+              : { text: "Open Sepolia Etherscan", href: sepoliaRoot },
       },
       {
         title: "Verify the Hardware",
@@ -174,7 +176,10 @@ export function VerificationProgressiveModal({
         ],
         details: [
           { label: "TEE platform", value: teeInfo?.platform ?? "—" },
-          { label: "Enclave / MRENCLAVE", value: teeInfo?.enclaveId ?? "—" },
+          {
+            label: "Enclave / MRENCLAVE",
+            value: teeInfo?.enclaveId ?? teeInfo?.mrenclave ?? "—",
+          },
           {
             label: "Debug mode",
             value:
@@ -293,22 +298,31 @@ export function VerificationProgressiveModal({
       >
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-5 pb-3 pt-4 sm:px-6 sm:pt-5">
           <div className="min-w-0 flex-1 pr-2">
-            <p
-              className={`${dokimosSectionLabelClass} text-[11px] tracking-[0.12em]`}
-              style={{ fontFamily: sans }}
-            >
-              Verification
-            </p>
-            <h2
-              id="verification-modal-title"
-              className="mt-1.5 text-xl font-semibold tracking-tight text-slate-900 sm:text-[22px]"
-              style={{ fontFamily: sans }}
-            >
-              {headerTitle}
-            </h2>
-            <p className="mt-1 truncate text-sm text-slate-500" style={{ fontFamily: sans }}>
-              {displayName} · {request.requestId}
-            </p>
+            {layer === 1 ? (
+              <h2
+                id="verification-modal-title"
+                className="text-base font-semibold tracking-tight text-slate-900 sm:text-lg"
+                style={{ fontFamily: sans }}
+              >
+                Verification
+              </h2>
+            ) : (
+              <>
+                <p
+                  className={`${dokimosSectionLabelClass} text-[11px] tracking-[0.12em]`}
+                  style={{ fontFamily: sans }}
+                >
+                  Verification
+                </p>
+                <h2
+                  id="verification-modal-title"
+                  className="mt-1.5 text-xl font-semibold tracking-tight text-slate-900 sm:text-[22px]"
+                  style={{ fontFamily: sans }}
+                >
+                  {headerTitle}
+                </h2>
+              </>
+            )}
           </div>
           <button
             type="button"
@@ -323,8 +337,10 @@ export function VerificationProgressiveModal({
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
           {layer === 1 && (
             <Layer1SimpleVerdict
+              status={request.status}
               displayName={displayName}
               verifiedAtIso={verifiedAtIso}
+              createdAtIso={request.createdAt}
               attributes={attributes}
               onHow={() => setLayer(2)}
               onTechnical={() => setLayer(3)}
@@ -351,64 +367,108 @@ export function VerificationProgressiveModal({
   );
 }
 
+function formatModalTimestamp(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
 function Layer1SimpleVerdict({
+  status,
   displayName,
   verifiedAtIso,
+  createdAtIso,
   attributes,
   onHow,
   onTechnical,
 }: {
+  status: VerificationRequest["status"];
   displayName: string;
   verifiedAtIso: string;
+  createdAtIso: string;
   attributes: { label: string; value: string }[];
   onHow: () => void;
   onTechnical: () => void;
 }) {
-  const ts = (() => {
-    const d = new Date(verifiedAtIso);
-    if (Number.isNaN(d.getTime())) return verifiedAtIso;
-    return d.toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-  })();
+  const verdict =
+    status === "approved"
+      ? {
+          Icon: CheckCircle,
+          iconClass: "text-emerald-600",
+          title: "Verification confirmed",
+          body: `${displayName}'s identity has been verified by secure hardware. No manual review needed.`,
+          timePrefix: "Verified",
+          timeIso: verifiedAtIso,
+          boxTitle: "What was verified:",
+          rowIcon: CheckCircle,
+          rowIconClass: "text-emerald-600",
+        }
+      : status === "pending"
+        ? {
+            Icon: Clock,
+            iconClass: "text-amber-500",
+            title: "Verification pending",
+            body: `Waiting for ${displayName} to complete identity verification in the secure flow.`,
+            timePrefix: "Requested",
+            timeIso: createdAtIso,
+            boxTitle: "What will be verified:",
+            rowIcon: Clock,
+            rowIconClass: "text-amber-500",
+          }
+        : {
+            Icon: XCircle,
+            iconClass: "text-red-600",
+            title: "Verification not completed",
+            body: `This verification did not complete successfully for ${displayName}.`,
+            timePrefix: "Last updated",
+            timeIso: verifiedAtIso,
+            boxTitle: "What was requested:",
+            rowIcon: XCircle,
+            rowIconClass: "text-red-600",
+          };
+
+  const VerdictIcon = verdict.Icon;
+  const RowIcon = verdict.rowIcon;
+  const ts = formatModalTimestamp(verdict.timeIso);
 
   return (
     <div className="space-y-6">
       <div className="flex items-start gap-3">
-        <CheckCircle
-          className="mt-1 h-8 w-8 flex-shrink-0 text-emerald-600"
+        <VerdictIcon
+          className={`mt-1 h-8 w-8 flex-shrink-0 ${verdict.iconClass}`}
           aria-hidden
         />
         <div>
-          <p className="text-2xl font-semibold text-slate-900">Verification confirmed</p>
-          <p className="mt-2 text-slate-500">
-            {displayName}&apos;s identity has been verified by secure hardware.
-            No manual review needed.
-          </p>
+          <p className="text-2xl font-semibold text-slate-900">{verdict.title}</p>
+          <p className="mt-2 text-slate-500">{verdict.body}</p>
         </div>
       </div>
 
-      <div className="text-sm text-slate-500">Verified: {ts}</div>
+      <div className="text-sm text-slate-500">
+        {verdict.timePrefix}: {ts}
+      </div>
 
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
         <h3 className="mb-3 text-sm font-semibold text-slate-900">
-          What was verified:
+          {verdict.boxTitle}
         </h3>
         {attributes.length === 0 ? (
           <p className="text-sm text-slate-500">
-            Attribute details appear when included in the attestation.
+            No attribute checklist for this request yet.
           </p>
         ) : (
           <div className="space-y-2">
             {attributes.map((attr) => (
               <div key={`${attr.label}-${attr.value}`} className="flex gap-2 text-sm">
-                <CheckCircle
-                  className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600"
+                <RowIcon
+                  className={`mt-0.5 h-4 w-4 flex-shrink-0 ${verdict.rowIconClass}`}
                   aria-hidden
                 />
                 <div>
@@ -556,12 +616,19 @@ function Layer2HowItWorks({
   );
 }
 
+type CopyFieldRow = {
+  key: string;
+  label: string;
+  fullCopy: string;
+};
+
 type StepConfig = {
   title: string;
   progressPct: number;
   stepOk: boolean;
   intro: string;
   statusLines: string[];
+  copyFieldRows?: CopyFieldRow[];
   whatThisProves: string[];
   details: { label: string; value: string }[];
   link: { text: string; href: string } | null;
@@ -578,6 +645,13 @@ function Layer3Technical({
   onToggleStep: (i: number) => void;
   onBack: () => void;
 }) {
+  const [openCopyRows, setOpenCopyRows] = useState<Record<string, boolean>>({});
+
+  const toggleCopyRow = (stepIdx: number, key: string) => {
+    const id = `${stepIdx}-${key}`;
+    setOpenCopyRows((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
   return (
     <div className="space-y-6">
       <p className="text-sm text-slate-600">
@@ -610,17 +684,75 @@ function Layer3Technical({
 
             <p className="mb-3 text-sm leading-relaxed text-slate-600">{step.intro}</p>
 
-            <div className="mb-3 space-y-2">
-              {step.statusLines.map((line) => (
-                <div key={line} className="flex items-start gap-2">
-                  <CheckCircle
-                    className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600"
-                    aria-hidden
-                  />
-                  <span className="text-sm text-slate-700">{line}</span>
-                </div>
-              ))}
-            </div>
+            {step.copyFieldRows && step.copyFieldRows.length > 0 ? (
+              <div className="mb-3 space-y-3">
+                {step.copyFieldRows.map((row) => {
+                  const rowId = `${i}-${row.key}`;
+                  const isOpen = Boolean(openCopyRows[rowId]);
+                  const canCopy = row.fullCopy.length > 0;
+                  return (
+                    <div key={row.key} className="flex items-start gap-2">
+                      <CheckCircle
+                        className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600"
+                        aria-hidden
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="text-sm font-medium text-slate-900">
+                            {row.label}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => toggleCopyRow(i, row.key)}
+                            className="shrink-0 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-dokimos-accent transition hover:border-dokimos-accent/40 hover:bg-teal-50/80"
+                          >
+                            {isOpen ? "Close" : "Open"}
+                          </button>
+                        </div>
+                        {isOpen && (
+                          <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                            <div className="relative rounded-md border border-slate-100 bg-white">
+                              <button
+                                type="button"
+                                disabled={!canCopy}
+                                title="Copy"
+                                aria-label="Copy to clipboard"
+                                onClick={() => {
+                                  if (canCopy) {
+                                    void navigator.clipboard.writeText(row.fullCopy);
+                                  }
+                                }}
+                                className="absolute right-2 top-2 z-10 rounded-md border border-slate-200/80 bg-white/95 p-1.5 text-slate-600 shadow-sm backdrop-blur-sm transition hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                <ClipboardCopy className="h-4 w-4" strokeWidth={2} aria-hidden />
+                              </button>
+                              <pre
+                                className="max-h-56 overflow-auto whitespace-pre-wrap break-all pr-12 pt-2.5 pb-2.5 pl-2.5 font-mono text-[11px] leading-relaxed text-slate-800 select-all"
+                                tabIndex={0}
+                              >
+                                {canCopy ? row.fullCopy : "—"}
+                              </pre>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="mb-3 space-y-2">
+                {step.statusLines.map((line, li) => (
+                  <div key={`${step.title}-line-${li}`} className="flex items-start gap-2">
+                    <CheckCircle
+                      className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600"
+                      aria-hidden
+                    />
+                    <span className="text-sm text-slate-700">{line}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <button
               type="button"
@@ -645,9 +777,9 @@ function Layer3Technical({
 
             {step.details.length > 0 && (
               <div className="mb-4 space-y-2">
-                {step.details.map((detail) => (
+                {step.details.map((detail, di) => (
                   <div
-                    key={`${detail.label}-${detail.value}`}
+                    key={`${step.title}-${di}-${detail.label}`}
                     className="flex flex-col gap-0.5 text-xs sm:flex-row sm:items-start sm:gap-2"
                   >
                     <span className="min-w-[100px] text-slate-500">{detail.label}:</span>

@@ -1,19 +1,6 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { useRouter } from "next/navigation";
-import { useDokimosApp } from "@/contexts/DokimosAppContext";
-import { Screen06History } from "@/components/DokimosFlow";
-
+/** Activity hub removed — send users to the vault home. */
 export default function RequestsPage() {
-  const router = useRouter();
-  const { setSelectedRequest } = useDokimosApp();
-
-  return (
-    <Screen06History
-      onReviewRequest={(request) => {
-        setSelectedRequest(request);
-        router.push("/app/requests/review");
-      }}
-    />
-  );
+  redirect("/app/vault");
 }

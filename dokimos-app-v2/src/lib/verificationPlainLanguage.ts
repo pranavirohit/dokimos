@@ -113,17 +113,18 @@ export function buildPlainLanguageVerificationRows(
       value: String(attrs.documentType),
     });
   }
-  if (
+  const hasDocExpiryDate =
     attrs.documentExpiryDate != null &&
     String(attrs.documentExpiryDate).trim() !== "" &&
-    String(attrs.documentExpiryDate) !== "Unknown"
-  ) {
+    String(attrs.documentExpiryDate) !== "Unknown";
+
+  if (hasDocExpiryDate) {
     rows.push({
-      label: "Document Expires",
+      label: "Document Expiry Date",
       value: formatIsoDateForVerifier(String(attrs.documentExpiryDate)),
     });
   }
-  if (typeof attrs.notExpired === "boolean") {
+  if (typeof attrs.notExpired === "boolean" && !hasDocExpiryDate) {
     rows.push({
       label: "ID Document",
       value: attrs.notExpired
@@ -164,4 +165,50 @@ export function buildPlainLanguageVerificationRows(
   }
 
   return rows;
+}
+
+/** Labels for `requestedAttributes` when there is no attestation payload yet. */
+const REQUESTED_ATTRIBUTE_LABELS: Record<string, string> = {
+  name: "Full Name",
+  dateOfBirth: "Date of Birth",
+  nationality: "Nationality",
+  address: "Address",
+  documentType: "Document Type",
+  documentExpiryDate: "Document Expiry Date",
+  notExpired: "ID Document",
+  ageOver18: "Age (18+)",
+  ageOver21: "Age (21+)",
+};
+
+function labelForRequestedAttributeKey(key: string): string {
+  return REQUESTED_ATTRIBUTE_LABELS[key] ?? toTitleCaseWords(key.replace(/_/g, " "));
+}
+
+/**
+ * Rows for the verifier modal “What was verified” block: prefer attestation detail,
+ * else derive from `requestedAttributes` so every request shows a consistent checklist.
+ */
+export function buildVerificationSummaryRows(
+  request: VerificationRequest
+): { label: string; value: string }[] {
+  const att = request.attestation as Record<string, unknown> | undefined;
+  if (att) {
+    const fromAtt = buildPlainLanguageVerificationRows(att, request.userEmail);
+    if (fromAtt.length > 0) return fromAtt;
+  }
+
+  const keys = request.requestedAttributes ?? [];
+  if (keys.length === 0) return [];
+
+  return keys.map((key) => {
+    let value: string;
+    if (request.status === "pending") {
+      value = "Pending — user has not finished verification";
+    } else if (request.status === "approved") {
+      value = key === "name" ? getVerificationDisplayName(request) : "Verified";
+    } else {
+      value = "Not completed";
+    }
+    return { label: labelForRequestedAttributeKey(key), value };
+  });
 }

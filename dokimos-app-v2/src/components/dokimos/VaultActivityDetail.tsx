@@ -1,13 +1,15 @@
 "use client";
 
 import { useMemo } from "react";
-import Link from "next/link";
+import { Check } from "lucide-react";
 import { vaultDetailTitleClass, vaultInsetPanelClass, vaultPlaidDetailCardClass } from "@/lib/vaultDetailPlaid";
+import { formatVerificationActivityRelativeTime } from "@/lib/verificationActivityTime";
 import type { VerificationRequest } from "@/types/dokimos";
 import {
   formatVerificationAttributeKey,
   getCompanyBadgeColor,
   getDisplayedAttributeKeys,
+  isExcludedFromConsumerActivityList,
 } from "@/lib/verificationRequestDisplay";
 
 const sans = "var(--font-instrument-sans), system-ui, sans-serif" as const;
@@ -16,22 +18,11 @@ type VaultActivityDetailProps = {
   allRequests: VerificationRequest[];
 };
 
-function approvalTimestamp(r: VerificationRequest): string {
-  const ts = r.completedAt || r.createdAt;
-  return new Date(ts).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-}
-
 export function VaultActivityDetail({ allRequests }: VaultActivityDetailProps) {
   const approvedRequests = useMemo(() => {
     return [...allRequests]
       .filter((r) => r.status === "approved")
+      .filter((r) => !isExcludedFromConsumerActivityList(r))
       .sort(
         (a, b) =>
           new Date(b.completedAt || b.createdAt).getTime() -
@@ -65,7 +56,8 @@ export function VaultActivityDetail({ allRequests }: VaultActivityDetailProps) {
                   const badgeColor = getCompanyBadgeColor(r.verifierName ?? "");
                   const keys = getDisplayedAttributeKeys(r);
                   const labels = keys.map(formatVerificationAttributeKey);
-                  const when = approvalTimestamp(r);
+                  const whenIso = r.completedAt || r.createdAt;
+                  const when = formatVerificationActivityRelativeTime(whenIso);
 
                   return (
                     <li key={r.requestId}>
@@ -84,19 +76,45 @@ export function VaultActivityDetail({ allRequests }: VaultActivityDetailProps) {
                           >
                             {r.verifierName || "Organization"}
                           </p>
-                          <p
-                            className="mt-1 text-[13px] leading-snug text-slate-600"
-                            style={{ fontFamily: sans }}
-                          >
-                            {labels.length > 0
-                              ? labels.join(" · ")
-                              : "Verification approved"}
-                          </p>
+                          {labels.length > 0 ? (
+                            <ul className="mt-2 space-y-1.5" aria-label="Verified attributes">
+                              {labels.map((label) => (
+                                <li
+                                  key={label}
+                                  className="flex items-start gap-2 text-[13px] leading-snug text-slate-600"
+                                >
+                                  <Check
+                                    className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600"
+                                    strokeWidth={2.5}
+                                    aria-hidden
+                                  />
+                                  <span style={{ fontFamily: sans }}>{label}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <div className="mt-2 flex items-start gap-2 text-[13px] leading-snug text-slate-600">
+                              <Check
+                                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600"
+                                strokeWidth={2.5}
+                                aria-hidden
+                              />
+                              <span style={{ fontFamily: sans }}>Verification approved</span>
+                            </div>
+                          )}
                         </div>
                         <time
-                          dateTime={r.completedAt || r.createdAt}
-                          className="shrink-0 pt-0.5 text-right text-[12px] text-slate-500 sm:text-[13px]"
+                          dateTime={whenIso}
+                          className="max-w-[7.5rem] shrink-0 pt-0.5 text-right text-[12px] leading-snug text-slate-500 sm:max-w-none sm:text-[13px]"
                           style={{ fontFamily: sans }}
+                          title={new Date(whenIso).toLocaleString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit",
+                            hour12: true,
+                          })}
                         >
                           {when}
                         </time>
@@ -107,14 +125,6 @@ export function VaultActivityDetail({ allRequests }: VaultActivityDetailProps) {
               </ul>
             )}
           </div>
-
-          <Link
-            href="/app/requests"
-            className="block text-center text-[13px] font-medium text-slate-600 underline decoration-slate-300 underline-offset-4 hover:text-slate-900"
-            style={{ fontFamily: sans }}
-          >
-            See all in Activity →
-          </Link>
         </div>
       </div>
     </div>

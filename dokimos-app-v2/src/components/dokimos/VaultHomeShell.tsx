@@ -87,7 +87,7 @@ export function VaultHomeShell({ verificationUrl, sans, children }: VaultHomeShe
             className="mt-8 flex w-full max-w-md flex-col gap-3 sm:max-w-none sm:flex-row sm:justify-center sm:gap-4"
           >
             <Link
-              href="/app/requests"
+              href="/app/vault"
               className="inline-flex h-12 min-h-[44px] flex-1 items-center justify-center rounded-lg bg-emerald-500 px-6 text-[15px] font-medium text-white shadow-sm transition-colors hover:bg-emerald-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 sm:flex-initial sm:min-w-[200px]"
               style={{ fontFamily: sans }}
             >

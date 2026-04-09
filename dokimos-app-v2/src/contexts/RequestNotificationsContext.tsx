@@ -19,6 +19,7 @@ import { RequestNotificationModal } from "@/components/RequestNotificationModal"
 
 type RequestNotificationsContextValue = {
   pendingCount: number;
+  openRequestModal: (req: VerificationRequest) => void;
 };
 
 const RequestNotificationsContext = createContext<RequestNotificationsContextValue | null>(
@@ -132,9 +133,11 @@ export function RequestNotificationsProvider({ children }: { children: ReactNode
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
-    setModalRequest(added[0]);
+    const next = added[0];
+    setSelectedRequest(next);
+    setModalRequest(next);
     requestAnimationFrame(() => setModalVisible(true));
-  }, [pending, sessionStatus, modalRequest]);
+  }, [pending, sessionStatus, modalRequest, setSelectedRequest]);
 
   const dismissNotification = useCallback(() => {
     if (modalRequest) {
@@ -144,16 +147,34 @@ export function RequestNotificationsProvider({ children }: { children: ReactNode
     setTimeout(() => setModalRequest(null), 280);
   }, [modalRequest]);
 
-  const handleReview = useCallback(() => {
-    if (!modalRequest) return;
-    dismissedModalIdsRef.current.add(modalRequest.requestId);
-    setSelectedRequest(modalRequest);
+  const openRequestModal = useCallback(
+    (req: VerificationRequest) => {
+      setSelectedRequest(req);
+      dismissedModalIdsRef.current.delete(req.requestId);
+      setModalRequest(req);
+      setModalVisible(true);
+    },
+    [setSelectedRequest]
+  );
+
+  const handleApproved = useCallback(() => {
+    if (modalRequest) {
+      dismissedModalIdsRef.current.add(modalRequest.requestId);
+    }
     setModalVisible(false);
     setModalRequest(null);
-    router.push("/app/requests/review");
-  }, [modalRequest, router, setSelectedRequest]);
+    router.push("/app/requests/receipt");
+  }, [modalRequest, router]);
 
-  const value = useMemo(() => ({ pendingCount }), [pendingCount]);
+  const handleDenied = useCallback(() => {
+    dismissNotification();
+    void fetchRequests();
+  }, [dismissNotification, fetchRequests]);
+
+  const value = useMemo(
+    () => ({ pendingCount, openRequestModal }),
+    [pendingCount, openRequestModal]
+  );
 
   return (
     <RequestNotificationsContext.Provider value={value}>
@@ -162,7 +183,8 @@ export function RequestNotificationsProvider({ children }: { children: ReactNode
         request={modalRequest}
         open={modalVisible && modalRequest !== null}
         onClose={dismissNotification}
-        onReview={handleReview}
+        onApproved={handleApproved}
+        onDenied={handleDenied}
       />
     </RequestNotificationsContext.Provider>
   );

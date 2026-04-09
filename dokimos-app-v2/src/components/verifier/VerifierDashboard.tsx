@@ -1,17 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import type { LucideIcon } from "lucide-react";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import Image from "next/image";
+import axios from "axios";
 import {
-  Building2,
   Check,
   CheckCircle,
   XCircle,
   Shield,
-  Car,
-  Home,
-  FileText,
-  UserCheck,
   ExternalLink,
   Copy,
   TrendingUp,
@@ -31,6 +27,10 @@ import {
   ArrowUpDown,
   ChevronsLeft,
   ChevronsRight,
+  Send,
+  LayoutGrid,
+  ClipboardList,
+  Layers,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -40,14 +40,15 @@ import {
   dokimosSectionLabelClass,
 } from "@/lib/dokimosLayout";
 import { BUSINESS_DEMO_REQUESTS } from "@/components/verifier/businessDemoData";
-import { VerificationProgressiveModal } from "@/components/verifier/VerificationProgressiveModal";
+import VerificationWizard from "@/components/verifier/VerificationWizard";
 import {
-  buildPlainLanguageVerificationRows,
   getVerificationDisplayName as displayNameForRequest,
   resolveVerificationDisplayName,
+  VERIFICATION_DISPLAY_NAME_FALLBACK,
 } from "@/lib/verificationPlainLanguage";
 import type { VerificationRequest } from "@/types/dokimos";
-import { VerifierLiveRequestPanel } from "@/components/verifier/VerifierLiveRequestPanel";
+import { postVerificationRequest } from "@/lib/verifierLiveRequest";
+import { formatVerificationActivityRelativeTime } from "@/lib/verificationActivityTime";
 
 interface VerifierSession {
   verifierId: string;
@@ -130,63 +131,6 @@ const WORKFLOW_ATTRIBUTE_OPTIONS: {
   },
 ];
 
-const PROGRAM_ICON_MAP: Record<
-  ProgramIconKey,
-  { Icon: LucideIcon; bg: string; fg: string }
-> = {
-  userCheck: { Icon: UserCheck, bg: "bg-slate-100", fg: "text-slate-700" },
-  car: { Icon: Car, bg: "bg-sky-50", fg: "text-sky-700" },
-  shield: { Icon: Shield, bg: "bg-emerald-50", fg: "text-emerald-700" },
-};
-
-/** Workflow-specific icons (preferred over PROGRAM_ICON_MAP for scanning). */
-const WORKFLOW_PROGRAM_ICONS: Record<
-  string,
-  { Icon: LucideIcon; bg: string; fg: string }
-> = {
-  host_verification: {
-    Icon: Home,
-    bg: "bg-green-100",
-    fg: "text-green-700",
-  },
-  guest_verification: {
-    Icon: UserCheck,
-    bg: "bg-sky-100",
-    fg: "text-sky-700",
-  },
-  driver_background_check: {
-    Icon: Car,
-    bg: "bg-blue-100",
-    fg: "text-blue-700",
-  },
-  vehicle_registration: {
-    Icon: FileText,
-    bg: "bg-amber-100",
-    fg: "text-amber-700",
-  },
-  continuous_monitoring: {
-    Icon: Shield,
-    bg: "bg-emerald-100",
-    fg: "text-emerald-700",
-  },
-  driver_onboarding: {
-    Icon: Car,
-    bg: "bg-blue-100",
-    fg: "text-blue-700",
-  },
-};
-
-function getWorkflowProgramIcon(program: VerificationProgram): {
-  Icon: LucideIcon;
-  bg: string;
-  fg: string;
-} {
-  return (
-    WORKFLOW_PROGRAM_ICONS[program.workflowId] ??
-    PROGRAM_ICON_MAP[program.iconKey]
-  );
-}
-
 type TabType = 'overview' | 'verifications' | 'workflows';
 
 /** Seeded TEE verifier for Airbnb — matches `src/index.ts` demo accounts (`airbnb_prod`). */
@@ -196,17 +140,29 @@ const AIRBNB_DEMO_SESSION: VerifierSession = {
   email: "verify@airbnb.com",
 };
 
-function mergeVerifierTableRows(
+/** Live TEE/API rows plus optimistic sends only — no bundled demo seed. */
+function mergeLiveAndOptimisticRequests(
   liveRequests: VerificationRequest[],
   optimisticRequests: VerificationRequest[]
 ): VerificationRequest[] {
   const liveIds = new Set(liveRequests.map((r) => r.requestId));
   const optimisticOnly = optimisticRequests.filter((o) => !liveIds.has(o.requestId));
-  const optimisticIds = new Set(optimisticOnly.map((o) => o.requestId));
+  return [...liveRequests, ...optimisticOnly];
+}
+
+function mergeVerifierTableRows(
+  liveRequests: VerificationRequest[],
+  optimisticRequests: VerificationRequest[]
+): VerificationRequest[] {
+  const merged = mergeLiveAndOptimisticRequests(liveRequests, optimisticRequests);
+  const liveIds = new Set(liveRequests.map((r) => r.requestId));
+  const optimisticIds = new Set(
+    optimisticRequests.filter((o) => !liveIds.has(o.requestId)).map((o) => o.requestId)
+  );
   const demoOnly = BUSINESS_DEMO_REQUESTS.filter(
     (d) => !liveIds.has(d.requestId) && !optimisticIds.has(d.requestId)
   );
-  return [...liveRequests, ...optimisticOnly, ...demoOnly];
+  return [...merged, ...demoOnly];
 }
 
 /** Demo dashboard for `/business` — polls TEE for real rows, merges with demo + send-panel optimistic. */
@@ -225,10 +181,29 @@ export function VerifierDashboard() {
     [liveRequests, optimisticRequests]
   );
 
-  const liveRequestIds = useMemo(
-    () => new Set(liveRequests.map((r) => r.requestId)),
-    [liveRequests]
-  );
+  /** Hide rows whose only resolvable label is the digit-placeholder fallback (“Verified applicant”). */
+  const dashboardRequests = useMemo(() => {
+    const fb = VERIFICATION_DISPLAY_NAME_FALLBACK.toLowerCase();
+    return mergedRequests.filter(
+      (r) => displayNameForRequest(r).toLowerCase() !== fb
+    );
+  }, [mergedRequests]);
+
+  /** Overview “Recent activity” — synced with verifier API only (same source as TEE `requests` store). */
+  const recentActivityRequests = useMemo(() => {
+    const merged = mergeLiveAndOptimisticRequests(liveRequests, optimisticRequests);
+    const fb = VERIFICATION_DISPLAY_NAME_FALLBACK.toLowerCase();
+    const filtered = merged.filter(
+      (r) => displayNameForRequest(r).toLowerCase() !== fb
+    );
+    return [...filtered]
+      .sort((a, b) => {
+        const ta = new Date(a.completedAt || a.createdAt).getTime();
+        const tb = new Date(b.completedAt || b.createdAt).getTime();
+        return tb - ta;
+      })
+      .slice(0, 5);
+  }, [liveRequests, optimisticRequests]);
 
   useEffect(() => {
     const verifierId = encodeURIComponent(session.verifierId);
@@ -294,117 +269,193 @@ export function VerifierDashboard() {
     },
   ];
 
+  const navItems: {
+    id: TabType;
+    label: string;
+    Icon: typeof LayoutGrid;
+  }[] = [
+    { id: "overview", label: "Overview", Icon: LayoutGrid },
+    { id: "verifications", label: "Verifications", Icon: ClipboardList },
+    { id: "workflows", label: "Programs", Icon: Layers },
+  ];
+
+  const sans = "var(--font-instrument-sans), system-ui, sans-serif" as const;
+
   return (
-    <div className="w-full space-y-8">
+    <div
+      className="flex h-full min-h-0 w-full flex-1 flex-col lg:flex-row"
+      style={{ fontFamily: sans }}
+    >
+      {/* Mobile: compact segmented nav */}
       <div
-        className={`${dokimosCardClass} flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between`}
+        className="sticky top-0 z-30 flex gap-1 border-b border-slate-200/90 bg-white/85 px-3 py-2.5 backdrop-blur-xl lg:hidden"
+        role="navigation"
+        aria-label="Dashboard sections"
       >
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-dokimos-core text-white ring-1 ring-slate-200">
-            <Building2 className="h-5 w-5 text-white" strokeWidth={2} />
-          </div>
-          <div>
-            <div className="text-sm font-semibold text-slate-900">
-              {session.companyName}
+        {navItems.map(({ id, label }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setActiveTab(id)}
+            className={`min-h-[44px] flex-1 rounded-xl px-2 py-2 text-center text-[13px] font-semibold transition-all ${
+              activeTab === id
+                ? "bg-slate-900 text-white shadow-sm shadow-slate-900/20"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Desktop: vault-style dark rail */}
+      <aside
+        className="relative hidden min-h-0 w-[min(280px,32vw)] shrink-0 flex-col self-stretch border-r border-white/10 bg-[#0b1020] lg:flex lg:h-full"
+        aria-label="Business navigation"
+      >
+        <div
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_80%_at_0%_0%,rgba(45,212,191,0.12),transparent_55%),radial-gradient(80%_60%_at_100%_100%,rgba(59,130,246,0.08),transparent)]"
+          aria-hidden
+        />
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col">
+          <div className="shrink-0 border-b border-white/10 px-6 pb-6 pt-8">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#0d9488] to-[#2DD4BF] shadow-lg shadow-teal-950/40 ring-1 ring-white/15">
+                <span className="text-base font-bold tracking-tight text-white">D</span>
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  Business
+                </p>
+                <p className="text-[15px] font-semibold text-white">Console</p>
+              </div>
             </div>
-            <div className="text-xs text-slate-500">{session.email}</div>
+          </div>
+
+          <nav
+            className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-y-contain px-3 py-4"
+            aria-label="Primary"
+          >
+            {navItems.map(({ id, label, Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setActiveTab(id)}
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[14px] font-semibold transition-all ${
+                  activeTab === id
+                    ? "bg-white/[0.09] text-white shadow-[inset_0_0_0_1px_rgba(45,212,191,0.35)] ring-1 ring-teal-400/15"
+                    : "text-slate-400 hover:bg-white/[0.05] hover:text-slate-100"
+                }`}
+              >
+                <Icon
+                  className={`h-5 w-5 shrink-0 ${activeTab === id ? "text-teal-300" : "text-slate-500"}`}
+                  strokeWidth={2}
+                  aria-hidden
+                />
+                {label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="mt-auto shrink-0 px-4 pb-8 pt-5">
+            <div className="rounded-xl bg-white/[0.04] p-3.5 ring-1 ring-white/10 backdrop-blur-sm">
+              <div className="flex items-center gap-3">
+                <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg shadow-inner ring-1 ring-white/10">
+                  <Image
+                    src="/airbnb_logo.png"
+                    alt="Airbnb"
+                    width={40}
+                    height={40}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-white">{session.companyName}</p>
+                  <p className="truncate text-xs text-slate-500">{session.email}</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-        <div className="text-right text-sm text-slate-500">
-          <p>
-            <span className="text-slate-500">Demo mode</span>
-            {" · "}
-            <span className="font-medium text-slate-700">Airbnb</span>
-          </p>
-          <p className="mt-1 text-xs text-slate-400">Live sync from TEE every 10s</p>
+      </aside>
+
+      {/* Main canvas — light panel aligned with consumer vault detail */}
+      <main className="relative min-h-0 flex-1 overflow-y-auto overscroll-y-contain bg-[#eceef1]">
+        <div
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_90%_50%_at_50%_-10%,rgba(13,148,136,0.07),transparent_50%),linear-gradient(180deg,rgba(255,255,255,0.5)0%,transparent_35%)]"
+          aria-hidden
+        />
+        <div className="relative mx-auto max-w-6xl px-5 py-8 sm:px-8 sm:py-10 lg:px-12 lg:py-12">
+          <header className="relative mb-6 lg:mb-8">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-teal-800/90">
+              Business
+            </p>
+            <h1 className="mt-3 max-w-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-600 bg-clip-text text-3xl font-semibold tracking-tight text-transparent sm:text-[2rem] lg:text-[2.125rem]">
+              {activeTab === "overview" ? "Overview" : "Verification Dashboard"}
+            </h1>
+          </header>
+
+          <div className="space-y-0">
+            <AnimatePresence mode="wait">
+              {activeTab === "overview" && (
+                <motion.div
+                  key="overview"
+                  initial={false}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.22 }}
+                >
+                  <OverviewTab
+                    requests={dashboardRequests}
+                    recentActivityRequests={recentActivityRequests}
+                    programs={programs}
+                    setActiveTab={setActiveTab}
+                  />
+                </motion.div>
+              )}
+              {activeTab === "verifications" && (
+                <motion.div
+                  key="verifications"
+                  initial={false}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.22 }}
+                >
+                  <VerificationsTab
+                    requests={dashboardRequests}
+                    programs={programs}
+                    workflowFilter={workflowFilter}
+                    onClearWorkflowFilter={() => setWorkflowFilter(null)}
+                    onRequestCreated={(req) => {
+                      setOptimisticRequests((prev) => {
+                        if (prev.some((r) => r.requestId === req.requestId)) return prev;
+                        return [req, ...prev];
+                      });
+                    }}
+                  />
+                </motion.div>
+              )}
+              {activeTab === "workflows" && (
+                <motion.div
+                  key="workflows"
+                  initial={false}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.22 }}
+                >
+                  <WorkflowsTab
+                    programs={programs}
+                    showCreateWorkflow={showCreateWorkflow}
+                    setShowCreateWorkflow={setShowCreateWorkflow}
+                    setActiveTab={setActiveTab}
+                    setWorkflowFilter={setWorkflowFilter}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
-      </div>
-
-      <VerifierLiveRequestPanel
-        onRequestCreated={(req) => {
-          setOptimisticRequests((prev) => {
-            if (prev.some((r) => r.requestId === req.requestId)) return prev;
-            return [req, ...prev];
-          });
-        }}
-      />
-
-      <div className="border-b border-slate-200">
-        <nav className="-mb-px flex flex-wrap gap-6 sm:gap-8" aria-label="Dashboard sections">
-          {[
-            { id: "overview" as const, label: "Overview" },
-            { id: "verifications" as const, label: "Verifications" },
-            { id: "workflows" as const, label: "Programs" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={`border-b-2 pb-3 text-[14px] font-semibold transition-colors ${
-                activeTab === tab.id
-                  ? "border-dokimos-accent text-dokimos-accent"
-                  : "border-transparent text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-      </div>
-
-      <div>
-        <AnimatePresence mode="wait">
-          {activeTab === "overview" && (
-            <motion.div
-              key="overview"
-              initial={false}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.22 }}
-            >
-              <OverviewTab
-                requests={mergedRequests}
-                programs={programs}
-                setActiveTab={setActiveTab}
-              />
-            </motion.div>
-          )}
-          {activeTab === "verifications" && (
-            <motion.div
-              key="verifications"
-              initial={false}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.22 }}
-            >
-              <VerificationsTab
-                requests={mergedRequests}
-                programs={programs}
-                workflowFilter={workflowFilter}
-                onClearWorkflowFilter={() => setWorkflowFilter(null)}
-                liveRequestIds={liveRequestIds}
-              />
-            </motion.div>
-          )}
-          {activeTab === "workflows" && (
-            <motion.div
-              key="workflows"
-              initial={false}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.22 }}
-            >
-              <WorkflowsTab
-                programs={programs}
-                showCreateWorkflow={showCreateWorkflow}
-                setShowCreateWorkflow={setShowCreateWorkflow}
-                setActiveTab={setActiveTab}
-                setWorkflowFilter={setWorkflowFilter}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+      </main>
     </div>
   );
 }
@@ -413,7 +464,18 @@ export function VerifierDashboard() {
 // TAB 1: OVERVIEW
 // ═══════════════════════════════════════════════════════════════════
 
-function OverviewTab({ requests, programs, setActiveTab }: { requests: VerificationRequest[]; programs: VerificationProgram[]; setActiveTab: (tab: TabType) => void }) {
+function OverviewTab({
+  requests,
+  recentActivityRequests,
+  programs,
+  setActiveTab,
+}: {
+  requests: VerificationRequest[];
+  /** From TEE/API + optimistic only; not demo-seeded. */
+  recentActivityRequests: VerificationRequest[];
+  programs: VerificationProgram[];
+  setActiveTab: (tab: TabType) => void;
+}) {
   const programName = (workflowId?: string) => {
     const id = workflowId || "host_verification";
     return programs.find((p) => p.workflowId === id)?.name ?? id;
@@ -422,32 +484,12 @@ function OverviewTab({ requests, programs, setActiveTab }: { requests: Verificat
   const totalVerifications = requests.length || 1570;
   const approvedCount = requests.filter(r => r.status === 'approved').length;
   const approvalRate = totalVerifications > 0 ? ((approvedCount / totalVerifications) * 100).toFixed(1) : '87.3';
-  const monthlyCost = (totalVerifications * 0.50).toFixed(2);
+  const activeWorkflowCount = programs.filter((p) => p.status === "active").length;
 
-  const recentActivity = requests.slice(0, 5);
-
-  const getRelativeTime = (timestamp: string) => {
-    const now = new Date();
-    const then = new Date(timestamp);
-    const diffMs = now.getTime() - then.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
-    const diffHours = Math.floor(diffMs / 3600000);
-    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-    return then.toLocaleDateString();
-  };
+  const recentActivity = recentActivityRequests;
 
   return (
     <div className="w-full max-w-full space-y-8">
-      <p className={`${dokimosSectionLabelClass} mb-1`} style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
-        At a glance
-      </p>
-      <p className="mb-6 max-w-prose text-sm text-slate-600">
-        Monitor verification volume, program performance, and recent activity.
-      </p>
-
       {/* Stats — 1 col phone, 2 col small tablet, 4 col from ~900px (laptop) */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 min-[900px]:grid-cols-4 min-[900px]:gap-6">
         <div className={dokimosCardClass}>
@@ -494,89 +536,21 @@ function OverviewTab({ requests, programs, setActiveTab }: { requests: Verificat
 
         <div className={dokimosCardClass}>
           <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-slate-400">
-            Monthly cost
+            Active workflows
           </p>
           <p className="mb-1 text-3xl font-semibold tabular-nums text-slate-900 tracking-tight">
-            ${monthlyCost}
+            {activeWorkflowCount.toLocaleString()}
           </p>
-          <p className="mb-2 text-xs text-slate-500">{totalVerifications} verifications × $0.50</p>
-          <div className="flex items-center gap-1 text-xs text-amber-600">
-            <TrendingUp size={14} />
-            <span>$47.20 vs last month</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Program breakdown */}
-      <div className={dokimosCardClass}>
-        <p className={`${dokimosSectionLabelClass} mb-4`}>Verifications by program</p>
-        <div className="space-y-4">
-          {(() => {
-            const totalMonthly = programs.reduce((s, p) => s + p.stats.thisMonth, 0) || 1;
-            return programs.map((program) => {
-              const percentage = ((program.stats.thisMonth / totalMonthly) * 100).toFixed(0);
-              return (
-                <div key={program.id}>
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="text-sm text-slate-600">{program.name}</span>
-                    <span className="text-sm font-medium text-slate-900">
-                      {program.stats.thisMonth.toLocaleString()} ({percentage}%)
-                    </span>
-                  </div>
-                  <div className="h-2 w-full rounded-full bg-slate-100">
-                    <div
-                      className="h-2 rounded-full bg-dokimos-accent transition-all duration-300 ease-out"
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            });
-          })()}
-        </div>
-      </div>
-
-      {/* How It Works - Eigen Integration Explainer */}
-      <div className="rounded-lg border border-slate-300 bg-gradient-to-br from-slate-50 to-white p-6 shadow-none ring-1 ring-slate-200">
-        <h2 className="mb-4 text-xl font-semibold text-slate-900 tracking-tight">
-          How Dokimos + EigenCompute works
-        </h2>
-        <div className="space-y-3 text-sm">
-          <div className="flex gap-3">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-dokimos-accent text-xs font-semibold text-white shadow-none">
-              1
-            </div>
-            <div>
-              <p className="font-medium text-slate-900">User uploads ID in TEE</p>
-              <p className="text-slate-500 text-xs mt-0.5">Document processed in Intel TDX secure enclave</p>
-            </div>
-          </div>
-          <div className="flex gap-3">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-dokimos-accent text-xs font-semibold text-white shadow-none">
-              2
-            </div>
-            <div>
-              <p className="font-medium text-slate-900">TEE generates attestation</p>
-              <p className="text-slate-500 text-xs mt-0.5">Cryptographic proof of code execution (MRENCLAVE)</p>
-            </div>
-          </div>
-          <div className="flex gap-3">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-dokimos-accent text-xs font-semibold text-white shadow-none">
-              3
-            </div>
-            <div>
-              <p className="font-medium text-slate-900">Eigen AVS verifies attestation</p>
-              <p className="text-slate-500 text-xs mt-0.5">Economic security via operator staking</p>
-            </div>
-          </div>
-          <div className="flex gap-3">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-dokimos-accent text-xs font-semibold text-white shadow-none">
-              4
-            </div>
-            <div>
-              <p className="font-medium text-slate-900">You verify independently</p>
-              <p className="text-slate-500 text-xs mt-0.5">Check signature on Etherscan, deployment on EigenCloud</p>
-            </div>
+          <p className="mb-2 text-xs text-slate-500">
+            {programs.length} program{programs.length === 1 ? "" : "s"} total
+          </p>
+          <div className="flex items-center gap-1 text-xs text-emerald-600">
+            <Layers size={14} />
+            <span>
+              {activeWorkflowCount === programs.length
+                ? "All programs active"
+                : `${programs.length - activeWorkflowCount} inactive`}
+            </span>
           </div>
         </div>
       </div>
@@ -623,941 +597,20 @@ function OverviewTab({ requests, programs, setActiveTab }: { requests: Verificat
                       {displayNameForRequest(req)}
                     </span>
                   </div>
-                  <span className="text-xs text-slate-400">{getRelativeTime(req.createdAt)}</span>
+                  <span className="text-xs text-slate-400">
+                    {formatVerificationActivityRelativeTime(
+                      req.completedAt || req.createdAt
+                    )}
+                  </span>
                 </div>
                 <p className="text-xs text-slate-500">
                   {programName(req.workflow)} · {req.requestedAttributes.length}{" "}
-                  attributes
+                  fields
                 </p>
               </div>
             ))}
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// VERIFY THIS CHECK — WIZARD MODAL
-// ═══════════════════════════════════════════════════════════════════
-
-interface VerifyAttestationApiResponse {
-  ok?: boolean;
-  signatureValid: boolean;
-  teeFieldsPresent: boolean;
-  eigenMetadataPresent: boolean;
-  eigenAppIdMatchesExpected: boolean;
-  note?: string;
-  expectedEigenAppId?: string;
-  error?: string;
-}
-
-const DEFAULT_GIT_SHA =
-  process.env.NEXT_PUBLIC_DOKIMOS_GIT_SHA ??
-  "1f722ca8084ebeae917ce0ef5b3012ce86296496";
-const DEFAULT_IMAGE_DIGEST =
-  process.env.NEXT_PUBLIC_DOKIMOS_IMAGE_DIGEST ??
-  "sha256:c3a3c11c046da144679625d824bb765c9b6fd358dec631324dce6b17fe4d504c";
-
-function truncateHash(s: string, len = 20): string {
-  if (!s || s.length <= len + 3) return s;
-  return `${s.slice(0, len)}...`;
-}
-
-function truncateMid(s: string, max = 40): string {
-  if (!s || s.length <= max) return s;
-  const half = Math.floor(max / 2) - 1;
-  return `${s.slice(0, half)}...${s.slice(-half)}`;
-}
-
-const VERIFY_MODAL_SANS =
-  "var(--font-instrument-sans), system-ui, sans-serif" as const;
-const VERIFY_MODAL_SERIF =
-  "var(--font-instrument-serif), Georgia, serif" as const;
-
-type VerifyLayer = "summary" | "explainer" | "technical";
-
-function downloadAttestationJson(att: unknown, filename: string) {
-  const blob = new Blob([JSON.stringify(att, null, 2)], {
-    type: "application/json",
-  });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function displayNameFromAttestation(
-  att: Record<string, unknown>,
-  fallbackEmail: string
-): string {
-  const attrs = att.attributes as Record<string, unknown> | undefined;
-  const n = attrs?.name;
-  return resolveVerificationDisplayName(
-    typeof n === "string" ? n : undefined,
-    fallbackEmail
-  );
-}
-
-function fallbackVerificationRows(req: VerificationRequest): {
-  label: string;
-  value: string;
-}[] {
-  const map: Record<string, string> = {
-    ageOver18: "Age",
-    ageOver21: "Age",
-    name: "Full Name",
-    dateOfBirth: "Date of Birth",
-    nationality: "Nationality",
-    notExpired: "ID Document",
-    documentType: "Document Type",
-    documentExpiryDate: "Document Expiry",
-  };
-  return (req.requestedAttributes ?? []).map((k) => ({
-    label: map[k] || k,
-    value: "Included in signed proof",
-  }));
-}
-
-function VerifyCheckModal({
-  open,
-  onClose,
-  req,
-}: {
-  open: boolean;
-  onClose: () => void;
-  req: VerificationRequest | null;
-}) {
-  const [layer, setLayer] = useState<VerifyLayer>("summary");
-  const [verificationResult, setVerificationResult] =
-    useState<VerifyAttestationApiResponse | null>(null);
-  const [verifying, setVerifying] = useState(false);
-  const [verifyError, setVerifyError] = useState<string | null>(null);
-  const [showSignatureDetails, setShowSignatureDetails] = useState(false);
-  const [openProofSections, setOpenProofSections] = useState<
-    Record<number, boolean>
-  >({});
-
-  useEffect(() => {
-    if (!open || !req?.attestation) {
-      setVerificationResult(null);
-      setVerifyError(null);
-      setVerifying(false);
-      return;
-    }
-    setLayer("summary");
-    setShowSignatureDetails(false);
-    setOpenProofSections({});
-    let cancelled = false;
-    const run = async () => {
-      setVerifying(true);
-      setVerifyError(null);
-      setVerificationResult(null);
-      try {
-        const response = await fetch("/api/verify-attestation", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(req.attestation),
-        });
-        const data = (await response.json()) as VerifyAttestationApiResponse;
-        if (!response.ok) {
-          throw new Error(data.error || "Verification request failed");
-        }
-        if (!cancelled) setVerificationResult(data);
-      } catch (e) {
-        console.error("Verification failed:", e);
-        if (!cancelled)
-          setVerifyError(e instanceof Error ? e.message : "Verification failed");
-      } finally {
-        if (!cancelled) setVerifying(false);
-      }
-    };
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [open, req?.requestId, req?.attestation]);
-
-  if (!open || !req?.attestation) return null;
-
-  const att = req.attestation as Record<string, unknown>;
-  const primaryBtn = `${dokimosPrimaryButtonClass} inline-flex items-center gap-2 !h-auto min-h-[44px] px-5 py-2.5 text-sm active:scale-[0.98]`;
-  const secondaryBtn = `${dokimosSecondaryButtonClass} !h-auto min-h-[44px] px-5 py-2.5 text-sm`;
-  const outlineBtn =
-    "inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition-colors duration-150 ease-out hover:bg-slate-50";
-  const ghostNavBtn =
-    "rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900";
-
-  const teeOk =
-    Boolean(verificationResult?.teeFieldsPresent) &&
-    Boolean(verificationResult?.eigenMetadataPresent);
-  const sigOk = Boolean(verificationResult?.signatureValid);
-  const eigenAppOk = Boolean(verificationResult?.eigenAppIdMatchesExpected);
-  const bio = att.biometricVerification as
-    | { faceMatch?: boolean; confidence?: number }
-    | undefined;
-  const faceStepOk =
-    bio == null
-      ? null
-      : Boolean(bio.faceMatch === true);
-
-  const plainRows = buildPlainLanguageVerificationRows(att, req.userEmail);
-  const personName = displayNameFromAttestation(att, req.userEmail);
-  const verifiedTs =
-    typeof att.timestamp === "string"
-      ? att.timestamp
-      : req.completedAt || req.createdAt;
-  const verifiedAtLabel = new Date(verifiedTs).toLocaleString("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-
-  const firstName = personName.split(/\s+/)[0] ?? personName;
-  const tee = att.tee as {
-    mrenclave?: string;
-    tcbStatus?: string;
-    quote?: string;
-  } | undefined;
-  const eigen = att.eigen as {
-    verificationUrl?: string;
-    appId?: string;
-  } | undefined;
-
-  const summaryPositive =
-    !verifying &&
-    !verifyError &&
-    verificationResult &&
-    sigOk;
-
-  const headerTitle =
-    layer === "summary"
-      ? "Verification"
-      : layer === "explainer"
-        ? "How Dokimos works"
-        : "Verify it yourself";
-
-  const TECH_STEPS = 5;
-
-  const toggleProof = (idx: number) => {
-    setOpenProofSections((p) => ({ ...p, [idx]: !p[idx] }));
-  };
-
-  const technicalAllPassed =
-    Boolean(verificationResult) &&
-    sigOk &&
-    teeOk &&
-    eigenAppOk &&
-    (faceStepOk === null || faceStepOk === true);
-
-  const stepProgress = (n: number) => (
-    <div className="mb-3">
-      <p className="text-xs font-medium text-slate-500">
-        Step {n} of {TECH_STEPS}
-      </p>
-      <div className="mt-1 h-1.5 w-full rounded-full bg-slate-200">
-        <div
-          className="h-full rounded-full bg-dokimos-accent transition-all duration-300"
-          style={{ width: `${(n / TECH_STEPS) * 100}%` }}
-        />
-      </div>
-    </div>
-  );
-
-  return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-200/90 bg-white shadow-2xl shadow-slate-900/20 transition-all duration-300"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white/95 backdrop-blur-md px-4 py-3 sm:px-6">
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            {layer !== "summary" && (
-              <button
-                type="button"
-                onClick={() => setLayer("summary")}
-                className={ghostNavBtn}
-                style={{ fontFamily: VERIFY_MODAL_SANS }}
-              >
-                ← Back
-              </button>
-            )}
-            <ShieldCheck className="h-6 w-6 shrink-0 text-dokimos-accent" />
-            <h2
-              className="truncate text-lg font-semibold text-slate-900 tracking-tight"
-              style={{ fontFamily: VERIFY_MODAL_SERIF }}
-            >
-              {headerTitle}
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 shrink-0 transition-colors"
-            aria-label="Close"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="space-y-6 p-6 transition-opacity duration-300">
-          {layer === "summary" && (
-            <div className="space-y-6">
-              {verifying && (
-                <div
-                  className="flex flex-col items-center justify-center gap-3 py-10 text-center"
-                  style={{ fontFamily: VERIFY_MODAL_SANS }}
-                >
-                  <span className="inline-flex gap-1 text-slate-400" aria-hidden>
-                    <span className="h-2 w-2 animate-bounce rounded-full bg-dokimos-accent" />
-                    <span
-                      className="h-2 w-2 animate-bounce rounded-full bg-dokimos-accent"
-                      style={{ animationDelay: "150ms" }}
-                    />
-                    <span
-                      className="h-2 w-2 animate-bounce rounded-full bg-dokimos-accent"
-                      style={{ animationDelay: "300ms" }}
-                    />
-                  </span>
-                  <p className="text-sm text-slate-600">
-                    Checking this proof…
-                  </p>
-                </div>
-              )}
-
-              {!verifying && verifyError && (
-                <div className="rounded-xl border border-red-200 bg-red-50 p-5">
-                  <div className="flex items-start gap-3">
-                    <XCircle className="mt-0.5 h-6 w-6 shrink-0 text-red-500" />
-                    <div style={{ fontFamily: VERIFY_MODAL_SANS }}>
-                      <p className="font-semibold text-red-900">
-                        Couldn&apos;t verify automatically
-                      </p>
-                      <p className="mt-1 text-sm text-red-800">{verifyError}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {!verifying &&
-                verificationResult &&
-                !verifyError &&
-                !sigOk && (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-6">
-                    <div className="flex items-start gap-3">
-                      <XCircle className="mt-0.5 h-8 w-8 shrink-0 text-amber-600" />
-                      <div style={{ fontFamily: VERIFY_MODAL_SANS }}>
-                        <h3
-                          className="text-lg font-semibold text-amber-950"
-                          style={{ fontFamily: VERIFY_MODAL_SERIF }}
-                        >
-                          Verification not confirmed
-                        </h3>
-                        <p className="mt-2 text-sm text-amber-900">
-                          The digital seal on this proof doesn&apos;t check out.
-                          Don&apos;t rely on this result until your team
-                          investigates.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-              {!verifying && summaryPositive && (
-                <>
-                  <div className="flex flex-col items-center text-center">
-                    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
-                      <CheckCircle
-                        className="h-9 w-9 text-emerald-600"
-                        strokeWidth={2}
-                      />
-                    </div>
-                    <h3
-                      className="text-2xl font-semibold text-slate-900"
-                      style={{ fontFamily: VERIFY_MODAL_SERIF }}
-                    >
-                      Verification confirmed
-                    </h3>
-                    <p
-                      className="mt-3 max-w-md text-[15px] leading-relaxed text-slate-600"
-                      style={{ fontFamily: VERIFY_MODAL_SANS }}
-                    >
-                      {personName}&apos;s identity has been verified by secure
-                      hardware. No manual review needed.
-                    </p>
-                    <p
-                      className="mt-4 text-sm text-slate-500"
-                      style={{ fontFamily: VERIFY_MODAL_SANS }}
-                    >
-                      Verified: {verifiedAtLabel}
-                    </p>
-                  </div>
-
-                  <div className="rounded-lg border border-slate-300 bg-slate-50/80 p-5">
-                    <p
-                      className="mb-3 text-sm font-semibold text-slate-900"
-                      style={{ fontFamily: VERIFY_MODAL_SANS }}
-                    >
-                      What was verified
-                    </p>
-                    <ul className="space-y-2.5">
-                      {(plainRows.length
-                        ? plainRows
-                        : fallbackVerificationRows(req)
-                      ).map((row) => (
-                        <li
-                          key={`${row.label}-${row.value}`}
-                          className="flex gap-2 text-left text-sm text-slate-700"
-                          style={{ fontFamily: VERIFY_MODAL_SANS }}
-                        >
-                          <Check
-                            className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600"
-                            strokeWidth={2.5}
-                          />
-                          <span>
-                            <span className="font-medium text-slate-900">
-                              {row.label}:
-                            </span>{" "}
-                            {row.value}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div
-                    className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-center"
-                    style={{ fontFamily: VERIFY_MODAL_SANS }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setLayer("explainer")}
-                      className={secondaryBtn}
-                    >
-                      How does this work?
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setLayer("technical")}
-                      className={primaryBtn}
-                    >
-                      Technical details
-                    </button>
-                  </div>
-                </>
-              )}
-
-              <div className="flex justify-end border-t border-slate-100 pt-4">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className={secondaryBtn}
-                  style={{ fontFamily: VERIFY_MODAL_SANS }}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          )}
-
-          {layer === "explainer" && (
-            <div
-              className="space-y-6"
-              style={{ fontFamily: VERIFY_MODAL_SANS }}
-            >
-              <p className="text-[15px] leading-relaxed text-slate-600">
-                Think of Dokimos like a notary, but digital and extremely hard
-                to fake.
-              </p>
-              <p className="text-sm font-medium text-slate-900">
-                Here&apos;s what happened:
-              </p>
-              <ol className="space-y-4">
-                <li className="flex gap-3">
-                  <span className="text-xl leading-none" aria-hidden>
-                    1️⃣
-                  </span>
-                  <div>
-                    <p className="font-semibold text-slate-900">
-                      {firstName} uploaded an ID once
-                    </p>
-                    <p className="mt-1 text-sm text-slate-600">
-                      It was sent to secure, isolated hardware—not stored on an
-                      ordinary app server.
-                    </p>
-                  </div>
-                </li>
-                <li className="flex gap-3">
-                  <span className="text-xl leading-none" aria-hidden>
-                    2️⃣
-                  </span>
-                  <div>
-                    <p className="font-semibold text-slate-900">
-                      The hardware checked the basics
-                    </p>
-                    <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
-                      <li>Is the ID real and not expired?</li>
-                      <li>Does the live face match the ID photo?</li>
-                      <li>Is the person old enough?</li>
-                    </ul>
-                  </div>
-                </li>
-                <li className="flex gap-3">
-                  <span className="text-xl leading-none" aria-hidden>
-                    3️⃣
-                  </span>
-                  <div>
-                    <p className="font-semibold text-slate-900">
-                      The hardware created a digital proof
-                    </p>
-                    <p className="mt-1 text-sm text-slate-600">
-                      Like a tamper-proof seal: you can check later that nothing
-                      was changed after the fact.
-                    </p>
-                  </div>
-                </li>
-                <li className="flex gap-3">
-                  <span className="text-xl leading-none" aria-hidden>
-                    4️⃣
-                  </span>
-                  <div>
-                    <p className="font-semibold text-slate-900">
-                      You received that proof
-                    </p>
-                    <p className="mt-1 text-sm text-slate-600">
-                      You can confirm it&apos;s real without taking Dokimos&apos;
-                      word for it.
-                    </p>
-                  </div>
-                </li>
-              </ol>
-
-              <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-4">
-                <p className="text-sm font-semibold text-emerald-950">
-                  Why this matters
-                </p>
-                <ul className="mt-2 space-y-1.5 text-sm text-emerald-900/90">
-                  <li>• Less manual review for routine decisions</li>
-                  <li>• Harder to fake than a screenshot or PDF</li>
-                  <li>• The user doesn&apos;t re-upload their ID for every partner</li>
-                  <li>• Clear record of what was checked</li>
-                </ul>
-              </div>
-
-              <div className="flex flex-wrap gap-3 border-t border-slate-100 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setLayer("summary")}
-                  className={secondaryBtn}
-                >
-                  ← Back
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLayer("technical")}
-                  className={primaryBtn}
-                >
-                  Verify it yourself →
-                </button>
-              </div>
-            </div>
-          )}
-
-          {layer === "technical" && (
-            <div
-              className="space-y-6"
-              style={{ fontFamily: VERIFY_MODAL_SANS }}
-            >
-              <p className="text-sm leading-relaxed text-slate-600">
-                Follow these steps to check this proof yourself. Most teams only
-                need the first two; the rest help compliance or engineering go
-                deeper.
-              </p>
-
-              {verifying && (
-                <div className="flex flex-col items-center gap-3 py-10 text-sm text-slate-500">
-                  <span className="inline-flex gap-0.5" aria-hidden>
-                    <span className="animate-bounce">.</span>
-                    <span className="animate-bounce" style={{ animationDelay: "120ms" }}>.</span>
-                    <span className="animate-bounce" style={{ animationDelay: "240ms" }}>.</span>
-                  </span>
-                  Running checks…
-                </div>
-              )}
-
-              {!verifying && verifyError && (
-                <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-                  {verifyError}
-                </div>
-              )}
-
-              {!verifying && verificationResult && (
-              <>
-              {/* Step 1 — Signature */}
-              <section className="rounded-lg border border-slate-300 bg-white p-4 shadow-none">
-                {stepProgress(1)}
-                <div className="flex items-start justify-between gap-2">
-                  <h3
-                    className="text-base font-semibold text-slate-900"
-                    style={{ fontFamily: VERIFY_MODAL_SERIF }}
-                  >
-                    Check the digital signature
-                  </h3>
-                  {!verifying && verificationResult && sigOk && (
-                    <CheckCircle className="h-5 w-5 shrink-0 text-emerald-600" />
-                  )}
-                  {!verifying && verificationResult && !sigOk && (
-                    <XCircle className="h-5 w-5 shrink-0 text-red-500" />
-                  )}
-                </div>
-                <p className="mt-2 text-sm text-slate-600">
-                  {!verifying && verificationResult && sigOk
-                    ? "Signature checks out — this proof has not been altered since it was issued."
-                    : !verifying && verificationResult && !sigOk
-                      ? "We could not confirm the digital seal on this proof."
-                      : null}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => toggleProof(0)}
-                  className="mt-3 flex items-center gap-1 text-sm font-medium text-dokimos-accent hover:text-dokimos-accentHover"
-                >
-                  {openProofSections[0] ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                  What this proves
-                </button>
-                {openProofSections[0] && (
-                  <p className="mt-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
-                    Like a wax seal on an important letter: if the seal is
-                    intact, you know nobody swapped the pages after it was
-                    signed.
-                  </p>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setShowSignatureDetails((v) => !v)}
-                  className="mt-3 text-sm font-medium text-slate-700 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
-                >
-                  {showSignatureDetails ? "Hide" : "Show"} signature details
-                </button>
-                {showSignatureDetails && (
-                  <div className="mt-2 space-y-2 font-mono text-xs text-slate-600">
-                    <div className="rounded bg-slate-50 p-2 break-all">
-                      signature: {truncateMid(String(att.signature ?? ""), 40)}
-                    </div>
-                    <div className="rounded bg-slate-50 p-2 break-all">
-                      signer: {String(att.signer)}
-                    </div>
-                    <div className="rounded bg-slate-50 p-2 break-all">
-                      messageHash: {truncateMid(String(att.messageHash ?? ""), 40)}
-                    </div>
-                  </div>
-                )}
-                <a
-                  href={`https://sepolia.etherscan.io/address/${String(att.signer)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`${outlineBtn} mt-3`}
-                >
-                  Open wallet on Etherscan
-                  <ExternalLink size={14} />
-                </a>
-              </section>
-
-              {/* Step 2 — Hardware */}
-              <section className="rounded-lg border border-slate-300 bg-white p-4 shadow-none">
-                {stepProgress(2)}
-                <div className="flex items-start justify-between gap-2">
-                  <h3
-                    className="text-base font-semibold text-slate-900"
-                    style={{ fontFamily: VERIFY_MODAL_SERIF }}
-                  >
-                    Verify the hardware
-                  </h3>
-                  {!verifying && verificationResult && teeOk && (
-                    <CheckCircle className="h-5 w-5 shrink-0 text-emerald-600" />
-                  )}
-                  {!verifying && verificationResult && !teeOk && (
-                    <Shield className="h-5 w-5 shrink-0 text-amber-500" />
-                  )}
-                </div>
-                <ul className="mt-2 space-y-1 text-sm text-slate-700">
-                  <li className="flex gap-2">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                    Ran on Intel TDX secure hardware (isolated environment)
-                  </li>
-                  <li className="flex gap-2">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                    Production-style health signal: {String(tee?.tcbStatus ?? "—")}
-                  </li>
-                </ul>
-                <button
-                  type="button"
-                  onClick={() => toggleProof(1)}
-                  className="mt-3 flex items-center gap-1 text-sm font-medium text-dokimos-accent hover:text-dokimos-accentHover"
-                >
-                  {openProofSections[1] ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                  What this proves
-                </button>
-                {openProofSections[1] && (
-                  <p className="mt-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
-                    The sensitive checks did not run on a generic cloud server
-                    that could be tweaked quietly—they ran in hardware designed
-                    to resist that kind of change.
-                  </p>
-                )}
-                {verificationResult?.note && (
-                  <p className="mt-3 text-xs leading-relaxed text-amber-900/90">
-                    Note: {verificationResult.note}
-                  </p>
-                )}
-                {eigen?.verificationUrl && (
-                  <a
-                    href={eigen.verificationUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`${primaryBtn} mt-3 w-fit`}
-                  >
-                    View on EigenCloud dashboard
-                    <ExternalLink size={14} />
-                  </a>
-                )}
-                {tee && (
-                  <div className="mt-3 space-y-1 font-mono text-[11px] text-slate-500">
-                    <div className="break-all">
-                      Build fingerprint: {truncateHash(String(tee.mrenclave ?? ""), 24)}
-                    </div>
-                  </div>
-                )}
-              </section>
-
-              {/* Step 3 — Source */}
-              <section className="rounded-lg border border-slate-300 bg-white p-4 shadow-none">
-                {stepProgress(3)}
-                <div className="flex items-start justify-between gap-2">
-                  <h3
-                    className="text-base font-semibold text-slate-900"
-                    style={{ fontFamily: VERIFY_MODAL_SERIF }}
-                  >
-                    Check the source code
-                  </h3>
-                  <CheckCircle className="h-5 w-5 shrink-0 text-emerald-600" />
-                </div>
-                <p className="mt-2 text-sm text-slate-600">
-                  The verification logic lives in a public repository—you can see
-                  what runs, line by line.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => toggleProof(2)}
-                  className="mt-3 flex items-center gap-1 text-sm font-medium text-dokimos-accent hover:text-dokimos-accentHover"
-                >
-                  {openProofSections[2] ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                  What this proves
-                </button>
-                {openProofSections[2] && (
-                  <p className="mt-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
-                    You are not asked to trust a hidden rules engine. If the
-                    code is public, teams can review what was allowed to happen
-                    to an ID or a selfie.
-                  </p>
-                )}
-                <a
-                  href={`https://github.com/pranavirohit/dokimos/tree/${DEFAULT_GIT_SHA}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`${primaryBtn} mt-3 w-fit`}
-                >
-                  View on GitHub
-                  <ExternalLink size={14} />
-                </a>
-              </section>
-
-              {/* Step 4 — Build */}
-              <section className="rounded-lg border border-slate-300 bg-white p-4 shadow-none">
-                {stepProgress(4)}
-                <div className="flex items-start justify-between gap-2">
-                  <h3
-                    className="text-base font-semibold text-slate-900"
-                    style={{ fontFamily: VERIFY_MODAL_SERIF }}
-                  >
-                    Verify the build
-                  </h3>
-                  <CheckCircle className="h-5 w-5 shrink-0 text-emerald-600" />
-                </div>
-                <p className="mt-2 text-sm text-slate-600">
-                  These fingerprints tie a public commit and image to what we
-                  ship—use them in a security review pack.
-                </p>
-                <ul className="mt-2 space-y-1 font-mono text-xs text-slate-600">
-                  <li className="break-all">Commit: {DEFAULT_GIT_SHA}</li>
-                  <li className="break-all">
-                    Image: {truncateHash(DEFAULT_IMAGE_DIGEST, 28)}
-                  </li>
-                </ul>
-                <button
-                  type="button"
-                  onClick={() => toggleProof(3)}
-                  className="mt-3 flex items-center gap-1 text-sm font-medium text-dokimos-accent hover:text-dokimos-accentHover"
-                >
-                  {openProofSections[3] ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                  What this proves
-                </button>
-                {openProofSections[3] && (
-                  <p className="mt-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
-                    In a mature deployment, you can confirm the code you read on
-                    GitHub is the same artifact that was deployed—no surprise
-                    edits after review.
-                  </p>
-                )}
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigator.clipboard.writeText(
-                      `${DEFAULT_GIT_SHA}\n${DEFAULT_IMAGE_DIGEST}`
-                    )
-                  }
-                  className={`${outlineBtn} mt-3`}
-                >
-                  Copy commit + image hash
-                  <Copy size={14} />
-                </button>
-              </section>
-
-              {/* Step 5 — Face */}
-              <section className="rounded-lg border border-slate-300 bg-white p-4 shadow-none">
-                {stepProgress(5)}
-                <div className="flex items-start justify-between gap-2">
-                  <h3
-                    className="text-base font-semibold text-slate-900"
-                    style={{ fontFamily: VERIFY_MODAL_SERIF }}
-                  >
-                    Confirm face match
-                  </h3>
-                  {bio != null && (
-                    <>
-                      {bio.faceMatch ? (
-                        <CheckCircle className="h-5 w-5 shrink-0 text-emerald-600" />
-                      ) : (
-                        <XCircle className="h-5 w-5 shrink-0 text-amber-500" />
-                      )}
-                    </>
-                  )}
-                </div>
-                {bio == null && (
-                  <p className="mt-2 text-sm text-slate-600">
-                    This proof does not include a live photo check. If your
-                    policy requires it, request a flow that captures a selfie.
-                  </p>
-                )}
-                {bio != null && (
-                  <p className="mt-2 text-sm text-slate-700">
-                    {bio.faceMatch
-                      ? `Face matched the ID photo (${typeof bio.confidence === "number" ? `${Math.round(bio.confidence * 100)}%` : "high"} confidence).`
-                      : "Face match did not meet the threshold for this check."}
-                  </p>
-                )}
-                <button
-                  type="button"
-                  onClick={() => toggleProof(4)}
-                  className="mt-3 flex items-center gap-1 text-sm font-medium text-dokimos-accent hover:text-dokimos-accentHover"
-                >
-                  {openProofSections[4] ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                  What this proves
-                </button>
-                {openProofSections[4] && (
-                  <p className="mt-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
-                    The person completing verification is the same person shown
-                    on the government ID—not a photo of a photo from another
-                    device.
-                  </p>
-                )}
-              </section>
-
-                <div
-                  className={`flex flex-col gap-2 rounded-xl border p-4 ${
-                    technicalAllPassed
-                      ? "border-emerald-200 bg-emerald-50/80"
-                      : "border-amber-200 bg-amber-50/80"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                    {technicalAllPassed ? (
-                      <>
-                        <Check className="h-5 w-5 text-emerald-600" />
-                        All automated checks passed
-                      </>
-                    ) : (
-                      <>
-                        <Info className="h-5 w-5 text-amber-600" />
-                        Some checks need human review
-                      </>
-                    )}
-                  </div>
-                  <p className="text-sm text-slate-700">
-                    {technicalAllPassed
-                      ? "You can rely on this result for routine decisions. For regulated environments, attach this proof to your audit trail."
-                      : "Review the amber items above before you treat this as fully verified."}
-                  </p>
-                </div>
-
-              <p className="text-sm text-slate-600">
-                You don&apos;t have to trust Dokimos blindly—each layer above is
-                designed so your team can re-check the story with public tools
-                and standard cryptography.
-              </p>
-              </>
-              )}
-
-              <div className="flex flex-wrap gap-3 border-t border-slate-100 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setLayer("summary")}
-                  className={secondaryBtn}
-                >
-                  ← Back to summary
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    downloadAttestationJson(
-                      att,
-                      `dokimos-proof-${req.requestId}.json`
-                    )
-                  }
-                  className={`${primaryBtn} gap-2`}
-                >
-                  <Download size={16} />
-                  Download proof
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );
@@ -1582,23 +635,36 @@ function rowStatus(req: VerificationRequest): RowStatus {
   return "pending";
 }
 
+/** Single timestamp column: label matches mental model (verified vs requested vs decision). */
+function activityDisplayForRow(req: VerificationRequest, rs: RowStatus): {
+  label: string;
+  iso: string;
+} {
+  if (rs === "verified" && req.completedAt) {
+    return { label: "Verified", iso: req.completedAt };
+  }
+  if (rs === "denied") {
+    const t = req.completedAt || req.createdAt;
+    return { label: "Decision", iso: t };
+  }
+  return { label: "Requested", iso: req.createdAt };
+}
+
 function VerificationsTab({
   requests,
   programs,
   workflowFilter,
   onClearWorkflowFilter,
-  liveRequestIds,
+  onRequestCreated,
 }: {
   requests: VerificationRequest[];
   programs: VerificationProgram[];
   workflowFilter: string | null;
   onClearWorkflowFilter: () => void;
-  liveRequestIds: Set<string>;
+  onRequestCreated: (req: VerificationRequest) => void;
 }) {
   const [verifyModalOpen, setVerifyModalOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] =
-    useState<VerificationRequest | null>(null);
-  const [progressiveRequest, setProgressiveRequest] =
     useState<VerificationRequest | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | RowStatus>("all");
@@ -1609,6 +675,11 @@ function VerificationsTab({
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const pageSize = 20;
+  const [sendRowKey, setSendRowKey] = useState<string | null>(null);
+  const [sendNotice, setSendNotice] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   const formatWorkflowName = (workflowId: string) => {
     const fromPrograms = programs.find((p) => p.workflowId === workflowId);
@@ -1636,6 +707,25 @@ function VerificationsTab({
   const filteredProgramName =
     workflowFilter &&
     programs.find((p) => p.workflowId === workflowFilter)?.name;
+
+  const queueStats = useMemo(() => {
+    let pending = 0;
+    for (const r of requests) {
+      if (rowStatus(r) === "pending") pending++;
+    }
+    return { pending, total: requests.length };
+  }, [requests]);
+
+  const hasActiveFilters =
+    Boolean(searchQuery.trim()) ||
+    statusFilter !== "all" ||
+    dateRange !== "all" ||
+    Boolean(workflowFilter);
+
+  const showFilterChips =
+    Boolean(searchQuery.trim()) ||
+    statusFilter !== "all" ||
+    dateRange !== "all";
 
   const baseFiltered = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
@@ -1691,6 +781,35 @@ function VerificationsTab({
     return sortedRows.slice(start, start + pageSize);
   }, [sortedRows, page, pageSize, totalPages]);
 
+  const rowSendKey = (req: VerificationRequest) =>
+    `${req.userEmail}\0${req.workflow ?? ""}`;
+
+  const handleSendRequest = async (req: VerificationRequest, e: MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setSendNotice(null);
+    setSendRowKey(rowSendKey(req));
+    try {
+      const created = await postVerificationRequest({
+        userEmail: req.userEmail,
+        workflow: req.workflow,
+      });
+      onRequestCreated(created);
+      setSendNotice({
+        type: "success",
+        message: `Request ${created.requestId} created for ${req.userEmail}. They will see it in Pending.`,
+      });
+    } catch (err: unknown) {
+      const msg =
+        axios.isAxiosError(err) && err.response?.data?.error
+          ? String(err.response.data.error)
+          : "Request failed. Is Fastify (TEE) running on TEE_ENDPOINT?";
+      setSendNotice({ type: "error", message: msg });
+    } finally {
+      setSendRowKey(null);
+    }
+  };
+
   const toggleSort = (key: typeof sortKey) => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else {
@@ -1706,17 +825,18 @@ function VerificationsTab({
       "Email",
       "Workflow",
       "Status",
-      "DateVerifiedOrRequested",
+      "LastActivity",
       "RequestId",
     ];
     const lines = sortedRows.map((req) => {
       const rs = rowStatus(req);
+      const activity = activityDisplayForRow(req, rs);
       return [
         displayNameForRequest(req),
         req.userEmail,
         formatWorkflowName(req.workflow || ""),
         rs,
-        req.completedAt || req.createdAt,
+        `${activity.label}: ${activity.iso}`,
         req.requestId,
       ]
         .map((c) => `"${String(c).replace(/"/g, '""')}"`)
@@ -1758,13 +878,29 @@ function VerificationsTab({
   };
 
   return (
-    <div className="w-full max-w-full space-y-8">
-      <p className={`${dokimosSectionLabelClass} mb-1`} style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}>
-        Verifications
-      </p>
-      <p className="mb-6 max-w-prose text-sm text-slate-600">
-        Review and manage requests from your users.
-      </p>
+    <div className="w-full max-w-full space-y-5">
+      <div className="flex flex-col gap-1">
+        <p
+          className={`${dokimosSectionLabelClass} mb-0`}
+          style={{ fontFamily: "var(--font-instrument-sans), system-ui, sans-serif" }}
+        >
+          Verifications
+        </p>
+        <p className="text-sm text-slate-600">
+          <span className="font-medium text-slate-800">
+            {queueStats.pending} pending
+          </span>
+          <span className="text-slate-400"> · </span>
+          {queueStats.total} total
+          {hasActiveFilters ? (
+            <>
+              <span className="text-slate-400"> · </span>
+              Showing {sortedRows.length.toLocaleString()} match
+              {sortedRows.length === 1 ? "" : "es"}
+            </>
+          ) : null}
+        </p>
+      </div>
 
       {workflowFilter && filteredProgramName && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/90 px-4 py-3 text-sm text-slate-600">
@@ -1782,6 +918,19 @@ function VerificationsTab({
         </div>
       )}
 
+      {sendNotice ? (
+        <div
+          className={`rounded-xl border px-4 py-3 text-sm ${
+            sendNotice.type === "success"
+              ? "border-emerald-200 bg-emerald-50/80 text-emerald-900"
+              : "border-red-200 bg-red-50/80 text-red-800"
+          }`}
+          role={sendNotice.type === "error" ? "alert" : undefined}
+        >
+          {sendNotice.message}
+        </div>
+      ) : null}
+
       {/* Toolbar + table */}
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-[200px] flex-1 relative">
@@ -1797,32 +946,48 @@ function VerificationsTab({
             className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:ring-2 focus:ring-dokimos-accent"
           />
         </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value as "all" | RowStatus);
-            setPage(1);
-          }}
-          className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 focus:ring-2 focus:ring-dokimos-accent"
-        >
-          <option value="all">All statuses</option>
-          <option value="verified">Verified only</option>
-          <option value="pending">Pending only</option>
-          <option value="denied">Denied</option>
-          <option value="expired">Expired</option>
-        </select>
-        <select
-          value={dateRange}
-          onChange={(e) => {
-            setDateRange(e.target.value as "all" | "week" | "month");
-            setPage(1);
-          }}
-          className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 focus:ring-2 focus:ring-dokimos-accent"
-        >
-          <option value="all">All dates</option>
-          <option value="week">This week</option>
-          <option value="month">This month</option>
-        </select>
+        <div className="relative min-w-[11.5rem]">
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value as "all" | RowStatus);
+              setPage(1);
+            }}
+            aria-label="Filter by status"
+            className="w-full cursor-pointer appearance-none rounded-xl border border-slate-200/90 bg-white py-2.5 pl-3.5 pr-10 text-sm font-medium text-slate-900 shadow-sm shadow-slate-900/[0.04] transition-colors hover:border-slate-300 hover:bg-slate-50/90 focus:border-dokimos-accent/40 focus:outline-none focus:ring-2 focus:ring-dokimos-accent/20"
+          >
+            <option value="all">All statuses</option>
+            <option value="verified">Verified only</option>
+            <option value="pending">Pending only</option>
+            <option value="denied">Denied</option>
+            <option value="expired">Expired</option>
+          </select>
+          <ChevronDown
+            className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
+            strokeWidth={2}
+            aria-hidden
+          />
+        </div>
+        <div className="relative min-w-[11.5rem]">
+          <select
+            value={dateRange}
+            onChange={(e) => {
+              setDateRange(e.target.value as "all" | "week" | "month");
+              setPage(1);
+            }}
+            aria-label="Filter by date"
+            className="w-full cursor-pointer appearance-none rounded-xl border border-slate-200/90 bg-white py-2.5 pl-3.5 pr-10 text-sm font-medium text-slate-900 shadow-sm shadow-slate-900/[0.04] transition-colors hover:border-slate-300 hover:bg-slate-50/90 focus:border-dokimos-accent/40 focus:outline-none focus:ring-2 focus:ring-dokimos-accent/20"
+          >
+            <option value="all">All dates</option>
+            <option value="week">This week</option>
+            <option value="month">This month</option>
+          </select>
+          <ChevronDown
+            className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
+            strokeWidth={2}
+            aria-hidden
+          />
+        </div>
         <button
           type="button"
           onClick={exportCsv}
@@ -1833,105 +998,212 @@ function VerificationsTab({
         </button>
       </div>
 
+      {showFilterChips ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            Filters
+          </span>
+          {searchQuery.trim() ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery("");
+                setPage(1);
+              }}
+              className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              Search: &quot;{searchQuery.trim().length > 28 ? `${searchQuery.trim().slice(0, 28)}…` : searchQuery.trim()}
+              <X className="h-3 w-3 shrink-0 opacity-60" aria-hidden />
+            </button>
+          ) : null}
+          {statusFilter !== "all" ? (
+            <button
+              type="button"
+              onClick={() => {
+                setStatusFilter("all");
+                setPage(1);
+              }}
+              className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              Status:{" "}
+              {statusFilter === "verified"
+                ? "Verified"
+                : statusFilter === "pending"
+                  ? "Pending"
+                  : statusFilter === "denied"
+                    ? "Denied"
+                    : "Expired"}
+              <X className="h-3 w-3 shrink-0 opacity-60" aria-hidden />
+            </button>
+          ) : null}
+          {dateRange !== "all" ? (
+            <button
+              type="button"
+              onClick={() => {
+                setDateRange("all");
+                setPage(1);
+              }}
+              className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              Date: {dateRange === "week" ? "This week" : "This month"}
+              <X className="h-3 w-3 shrink-0 opacity-60" aria-hidden />
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className={`${dokimosCardClass} overflow-hidden !p-0`}>
         <div className="w-full overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left text-sm">
+          <table className="w-full min-w-[900px] table-fixed text-left text-sm">
             <thead className="border-b border-slate-200 bg-slate-50">
               <tr>
-                <th className="px-4 py-3 text-left">
+                <th className="w-[17%] min-w-0 px-4 py-3 text-left align-middle lg:w-[17%]" scope="col">
                   <button
                     type="button"
                     onClick={() => toggleSort("name")}
-                    className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-slate-600 hover:text-slate-900"
+                    className="inline-flex w-full items-center gap-1 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 hover:text-slate-900"
                   >
                     Name
-                    <ArrowUpDown className="h-3 w-3 text-slate-400" />
+                    <ArrowUpDown className="h-3 w-3 shrink-0 text-slate-400" />
                   </button>
                 </th>
-                <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 lg:table-cell">
+                <th
+                  className="hidden w-[17%] min-w-0 px-4 py-3 text-left align-middle text-xs font-semibold uppercase tracking-wider text-slate-600 lg:table-cell lg:w-[18%]"
+                  scope="col"
+                >
                   Email
                 </th>
-                <th className="px-4 py-3 text-left">
+                <th className="w-[19%] min-w-0 px-4 py-3 text-left align-middle lg:w-[19%]" scope="col">
                   <button
                     type="button"
                     onClick={() => toggleSort("workflow")}
-                    className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-slate-600 hover:text-slate-900"
+                    className="inline-flex w-full items-center gap-1 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 hover:text-slate-900"
                   >
                     Workflow
-                    <ArrowUpDown className="h-3 w-3 text-slate-400" />
+                    <ArrowUpDown className="h-3 w-3 shrink-0 text-slate-400" />
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left">
+                <th className="w-[12%] min-w-0 px-4 py-3 text-left align-middle lg:w-[11%]" scope="col">
                   <button
                     type="button"
                     onClick={() => toggleSort("status")}
-                    className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-slate-600 hover:text-slate-900"
+                    className="inline-flex w-full items-center gap-1 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 hover:text-slate-900"
                   >
                     Status
-                    <ArrowUpDown className="h-3 w-3 text-slate-400" />
+                    <ArrowUpDown className="h-3 w-3 shrink-0 text-slate-400" />
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left">
+                <th className="w-[15%] min-w-0 px-4 py-3 text-left align-middle lg:w-[17%]" scope="col">
                   <button
                     type="button"
                     onClick={() => toggleSort("verified")}
-                    className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-slate-600 hover:text-slate-900"
+                    title="Requested, decision, or verified time depending on status"
+                    className="inline-flex w-full min-w-0 items-center gap-1 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 hover:text-slate-900"
                   >
-                    Date verified
-                    <ArrowUpDown className="h-3 w-3 text-slate-400" />
+                    <span className="truncate">Last activity</span>
+                    <ArrowUpDown className="h-3 w-3 shrink-0 text-slate-400" />
                   </button>
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">
-                  Actions
+                <th
+                  className="w-[11%] min-w-0 px-3 py-3 text-left align-middle text-xs font-semibold uppercase tracking-wider text-slate-600 lg:w-[9%]"
+                  scope="col"
+                  title="Resend a verification request when the row is still open or can be retried"
+                >
+                  Send
+                </th>
+                <th
+                  className="w-[11%] min-w-0 pl-2 pr-5 py-3 text-left align-middle text-xs font-semibold uppercase tracking-wider text-slate-600 lg:w-[9%] lg:pr-6"
+                  scope="col"
+                >
+                  Review
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {pageRows.map((req) => {
                 const rs = rowStatus(req);
-                const when = req.completedAt || req.createdAt;
+                const activity = activityDisplayForRow(req, rs);
+                const showSend = rs !== "verified";
+                const reviewIsVerify = rs === "pending" || rs === "expired";
                 return (
                   <tr
                     key={req.requestId}
                     className="cursor-pointer transition-colors hover:bg-slate-50"
-                    onClick={() => setProgressiveRequest(req)}
+                    onClick={() => {
+                      setSelectedRequest(req);
+                      setVerifyModalOpen(true);
+                    }}
                   >
-                    <td className="px-4 py-3 font-medium text-slate-900">
-                      <span className="inline-flex flex-wrap items-center gap-2">
+                    <td className="w-[17%] min-w-0 px-4 py-3 align-middle font-medium text-slate-900 lg:w-[17%]">
+                      <span className="block min-w-0 truncate">
                         {displayNameForRequest(req)}
-                        {liveRequestIds.has(req.requestId) ? (
-                          <span className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-800">
-                            Live
-                          </span>
-                        ) : null}
                       </span>
                     </td>
-                    <td className="hidden max-w-[220px] truncate px-4 py-3 text-slate-600 lg:table-cell">
+                    <td
+                      className="hidden w-[17%] min-w-0 truncate px-4 py-3 align-middle text-slate-600 lg:table-cell lg:w-[18%]"
+                      title={req.userEmail}
+                    >
                       {req.userEmail}
                     </td>
-                    <td className="px-4 py-3 text-slate-700">
-                      {formatWorkflowName(req.workflow ?? "")}
+                    <td className="w-[19%] min-w-0 px-4 py-3 align-middle text-slate-700 lg:w-[19%]">
+                      <span className="line-clamp-2 break-words">
+                        {formatWorkflowName(req.workflow ?? "")}
+                      </span>
                     </td>
-                    <td className="px-4 py-3">{statusBadge(rs)}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                      {new Date(when).toLocaleString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}
+                    <td className="w-[12%] min-w-0 px-4 py-3 align-middle lg:w-[11%]">
+                      {statusBadge(rs)}
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setProgressiveRequest(req);
-                        }}
-                        className="text-sm font-medium text-dokimos-accent hover:text-dokimos-accentHover"
-                      >
-                        Verify Attestation
-                      </button>
+                    <td className="w-[15%] min-w-0 px-4 py-3 align-middle text-slate-600 lg:w-[17%]">
+                      <span className="block text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                        {activity.label}
+                      </span>
+                      <span className="whitespace-nowrap text-sm text-slate-700">
+                        {new Date(activity.iso).toLocaleString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </td>
+                    <td className="w-[11%] min-w-0 px-3 py-3 align-middle lg:w-[9%]">
+                      <div className="flex justify-start whitespace-nowrap">
+                        {!showSend ? (
+                          <span className="text-xs text-slate-400" title="Completed — resend not needed">
+                            —
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => void handleSendRequest(req, e)}
+                            disabled={sendRowKey === rowSendKey(req)}
+                            className={`inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-dokimos-accent transition-colors hover:border-dokimos-accent/40 hover:bg-teal-50/80 disabled:opacity-50`}
+                          >
+                            <Send className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                            {sendRowKey === rowSendKey(req) ? "Sending…" : "Send"}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                    <td className="w-[11%] min-w-0 pl-2 pr-5 py-3 align-middle lg:w-[9%] lg:pr-6">
+                      <div className="flex justify-start whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedRequest(req);
+                            setVerifyModalOpen(true);
+                          }}
+                          title={
+                            reviewIsVerify
+                              ? "Open verification — user may still need to complete checks"
+                              : "View verification record and proof details"
+                          }
+                          className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-dokimos-accent transition-colors hover:border-dokimos-accent/40 hover:bg-teal-50/80"
+                        >
+                          {reviewIsVerify ? "Verify" : "View"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -1969,21 +1241,17 @@ function VerificationsTab({
         </div>
       </div>
 
-      <VerifyCheckModal
-        open={verifyModalOpen}
-        onClose={() => {
-          setVerifyModalOpen(false);
-          setSelectedRequest(null);
-        }}
-        req={selectedRequest}
-      />
-
-      {progressiveRequest && (
-        <VerificationProgressiveModal
-          request={progressiveRequest}
-          onClose={() => setProgressiveRequest(null)}
+      {verifyModalOpen && selectedRequest ? (
+        <VerificationWizard
+          key={selectedRequest.requestId}
+          request={selectedRequest}
+          open
+          onClose={() => {
+            setVerifyModalOpen(false);
+            setSelectedRequest(null);
+          }}
         />
-      )}
+      ) : null}
 
       {sortedRows.length === 0 && (
         <div className="rounded-lg border border-dashed border-slate-300 bg-white p-12 text-center shadow-none">
@@ -2047,66 +1315,63 @@ function WorkflowsTab({
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
         {programs.map((program) => {
-          const { Icon: ProgramIcon, bg: iconBg, fg: iconFg } =
-            getWorkflowProgramIcon(program);
           return (
           <div
             key={program.id}
-            className={`${dokimosCardClass} transition-colors duration-150 hover:border-slate-300/90 hover:bg-slate-50/80`}
+            className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-900/[0.04] transition-colors duration-150 hover:border-slate-300/90"
           >
-            <div className="mb-5 flex items-start justify-between gap-4">
-              <div className="flex min-w-0 flex-1 items-start gap-4">
-                <div
-                  className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${iconBg}`}
-                  aria-hidden
-                >
-                  <ProgramIcon className={`h-6 w-6 ${iconFg}`} strokeWidth={2} />
-                </div>
-                <div className="min-w-0">
+            <div className="border-b border-white/10 bg-[#0B0E14] px-5 pb-5 pt-5 sm:px-6 sm:pt-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
                   <div className="mb-1 flex flex-wrap items-center gap-2">
-                    <h2 className="text-lg font-semibold text-slate-900">
+                    <h2 className="font-landing text-lg font-semibold text-white">
                       {program.name}
                     </h2>
                     {program.status === "active" && (
-                      <span className="rounded px-2 py-0.5 text-xs font-semibold bg-emerald-500/15 text-emerald-800 ring-1 ring-emerald-500/20">
+                      <span className="rounded-md px-2 py-0.5 text-xs font-semibold bg-[#D1FADF] text-[#027A48] ring-1 ring-[#027A48]/15">
                         Active
                       </span>
                     )}
                     {program.status === "inactive" && (
-                      <span className="rounded px-2 py-0.5 text-xs font-semibold bg-slate-100 text-slate-500">
+                      <span className="rounded px-2 py-0.5 text-xs font-semibold bg-white/10 text-slate-300 ring-1 ring-white/15">
                         Inactive
                       </span>
                     )}
                   </div>
-                  <p className="text-sm text-slate-600">
+                  <p className="text-sm text-slate-300">
                     {program.audienceDescription}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="mb-6 flex flex-wrap items-center gap-4 sm:gap-5">
-              <div className="flex flex-wrap items-baseline gap-2">
-                <span className="text-2xl font-semibold tabular-nums text-slate-900">
+            <div className="px-5 pb-5 pt-5 sm:px-6 sm:pb-6">
+            <div className="mb-6 grid min-w-0 grid-cols-3 divide-x divide-slate-200">
+              <div className="flex min-w-0 flex-col items-center justify-center gap-0.5 px-1.5 text-center sm:px-3">
+                <span className="text-lg font-semibold tabular-nums leading-none text-slate-900 sm:text-2xl">
                   {program.stats.thisMonth.toLocaleString()}
                 </span>
-                <span className="text-sm text-slate-600">this month</span>
+                <span className="max-w-full text-[10px] leading-tight text-slate-600 sm:text-sm">
+                  this month
+                </span>
               </div>
-              <div className="hidden h-8 w-px shrink-0 bg-slate-200 sm:block" />
-              <div className="flex flex-wrap items-baseline gap-2">
-                <span className="text-2xl font-semibold tabular-nums text-emerald-600">
+              <div className="flex min-w-0 flex-col items-center justify-center gap-0.5 px-1.5 text-center sm:px-3">
+                <span className="text-lg font-semibold tabular-nums leading-none text-emerald-600 sm:text-2xl">
                   {program.stats.approvalRate}%
                 </span>
-                <span className="text-sm text-slate-600">approved</span>
+                <span className="max-w-full text-[10px] leading-tight text-slate-600 sm:text-sm">
+                  approved
+                </span>
               </div>
-              <div className="hidden h-8 w-px shrink-0 bg-slate-200 sm:block" />
-              <div className="flex flex-wrap items-baseline gap-2">
-                <span className="text-2xl font-semibold tabular-nums text-slate-900">
+              <div className="flex min-w-0 flex-col items-center justify-center gap-0.5 px-1.5 text-center sm:px-3">
+                <span className="text-lg font-semibold tabular-nums leading-none text-slate-900 sm:text-2xl">
                   {program.stats.avgTime}
                 </span>
-                <span className="text-sm text-slate-600">avg time</span>
+                <span className="max-w-full text-[10px] leading-tight text-slate-600 sm:text-sm">
+                  avg time
+                </span>
               </div>
             </div>
 
@@ -2232,6 +1497,7 @@ function WorkflowsTab({
                   </a>
                 </div>
               </div>
+            </div>
             </div>
           </div>
           );

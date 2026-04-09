@@ -107,11 +107,13 @@ export function VaultNavigationDashboard({
           </header>
 
           <div
-            className={`flex min-h-0 flex-1 flex-col px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-8 lg:px-6 ${
-              activeView ? "justify-start pt-4" : "justify-center overflow-y-auto pt-2 lg:px-8"
+            className={`flex min-h-0 flex-1 flex-col px-6 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-8 lg:px-6 ${
+              activeView
+                ? "justify-start pt-4"
+                : "items-center justify-center overflow-y-auto pt-[max(0.5rem,env(safe-area-inset-top))] lg:px-8"
             }`}
           >
-            <div className={activeView ? "w-full" : "mx-auto w-full max-w-2xl py-6 sm:py-10"}>
+            <div className={activeView ? "w-full" : "w-full max-w-2xl self-center"}>
               <AnimatePresence mode="wait">
                 {!activeView ? (
                   <motion.div

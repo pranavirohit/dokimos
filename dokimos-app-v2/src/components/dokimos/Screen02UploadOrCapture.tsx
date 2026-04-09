@@ -217,11 +217,6 @@ export function Screen02UploadOrCapture({
       });
 
       setStoredImageData(imageBase64);
-      try {
-        localStorage.setItem("dokimos_stored_image", imageBase64);
-      } catch {
-        /* ignore */
-      }
       onNext();
     } catch {
       setError("Could not read image. Please try again.");
@@ -292,9 +287,12 @@ export function Screen02UploadOrCapture({
     mode === "upload" ? "Upload your government ID" : "Take a photo of your ID";
   const cardDescription =
     mode === "upload"
-      ? "Take a photo or upload an image of any government-issued ID."
+      ? "Take a photo or upload an image of any government ID with a photo of you. Not even Dokimos can see your ID after processing."
       : "Position your ID in the frame, then capture. Use good lighting and avoid glare.";
-  const cardDetail = "Not even Dokimos can see your ID after processing.";
+  const cardDetail =
+    mode === "upload"
+      ? undefined
+      : "Not even Dokimos can see your ID after processing.";
 
   const nextDisabled = uploadState !== "selected";
 
@@ -425,7 +423,7 @@ export function Screen02UploadOrCapture({
                 />
                 <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1.5 text-[12px] font-medium text-white">
                   <Check size={12} strokeWidth={3} />
-                  Ready for Next
+                  Successfully Uploaded
                 </div>
                 <button
                   type="button"

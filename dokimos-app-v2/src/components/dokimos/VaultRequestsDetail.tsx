@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Clock } from "lucide-react";
 import { vaultDetailTitleClass, vaultInsetPanelClass, vaultPlaidDetailCardClass } from "@/lib/vaultDetailPlaid";
 import type { VerificationRequest } from "@/types/dokimos";
+import { dedupeAttributeKeysForDisplay } from "@/lib/verificationRequestDisplay";
 
 const sans = "var(--font-instrument-sans), system-ui, sans-serif" as const;
 
@@ -50,7 +51,9 @@ export function VaultRequestsDetail({
           ) : (
             <div className={`overflow-hidden ${vaultInsetPanelClass}`}>
               <ul className="divide-y divide-slate-100">
-                {pendingRequests.map((req) => (
+                {pendingRequests.map((req) => {
+                  const fieldCount = dedupeAttributeKeysForDisplay(req.requestedAttributes ?? []).length;
+                  return (
                   <li key={req.requestId}>
                     <button
                       type="button"
@@ -63,21 +66,21 @@ export function VaultRequestsDetail({
                           {req.verifierName || "Verification request"}
                         </p>
                         <p className="mt-0.5 text-[13px] text-slate-500">
-                          {req.requestedAttributes.length}{" "}
-                          {req.requestedAttributes.length === 1 ? "attribute" : "attributes"} requested
+                          {fieldCount} {fieldCount === 1 ? "field" : "fields"} requested
                         </p>
                       </div>
                       <span className="shrink-0 text-[13px] font-medium text-emerald-700">Review →</span>
                     </button>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             </div>
           )}
 
           {!requestsLoading && pendingRequests.length > 0 ? (
             <Link
-              href="/app/requests"
+              href="/app/vault"
               className="block text-center text-[13px] font-medium text-slate-600 underline decoration-slate-300 underline-offset-4 hover:text-slate-900"
               style={{ fontFamily: sans }}
             >
