@@ -4,6 +4,12 @@ Most identity verification works by having you upload your documents to a compan
 
 ---
 
+## See it in action
+
+The [5-minute demo](https://www.youtube.com/watch?v=kgIT-hWMoCM) walks through the complete flow: a user uploading their ID, the TEE processing it, the business side requesting specific attributes, and the five-step guided verification a counterparty can run independently to confirm the attestation is real without trusting Dokimos.
+
+---
+
 ## How it works
 
 The system has two sides: a user who builds a vault of verified credentials, and a business that requests specific attributes from that vault. Everything in between (the document reading, the face comparison, the cryptographic signing) happens inside a Trusted Execution Environment running on EigenCompute's Intel TDX hardware, where neither the user nor the developer nor the business can see or alter the computation.
