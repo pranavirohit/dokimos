@@ -1,6 +1,6 @@
 # Dokimos
 
-Every identity verification company is a honeypot. Persona, Stripe Identity, Onfido: they all store your ID in a database. One breach and millions of IDs leak. Dokimos is built on a different premise: verify once inside secure hardware, then share cryptographic proof forever. Your documents never touch a company's servers. The business receiving your attestation never sees your ID. They see a signed statement from tamper-proof code that says you passed, and they can verify the signature themselves without trusting anyone, including us. That's the shift: from identity data as a liability someone stores, to identity proof as something you control and selectively share.
+Most identity verification works by having you upload your documents to a company's servers, which stores them to run checks on your behalf. That works, but it means your ID lives somewhere you don't control, and every company that verifies you holds a copy. Dokimos is built on a different premise: verify once inside secure hardware, then share cryptographic proof forever. Your documents never touch a company's servers. The business receiving your attestation never sees your ID. They see a signed statement from tamper-proof code that says you passed, and they can verify the signature themselves without trusting anyone, including us. That's the shift: from identity data as something a company stores on your behalf, to identity proof as something you control and selectively share.
 
 ---
 
